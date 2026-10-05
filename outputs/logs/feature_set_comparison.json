@@ -1,0 +1,46 @@
+[
+  {
+    "set": "baseline",
+    "n_inputs": 3,
+    "n_free_params": 35,
+    "rmse": 18.22986363714964,
+    "mae": 13.573011333769397,
+    "pooled_rank_ic": -0.012643829880546919,
+    "monthly_mark_ic": 0.27922077922077926,
+    "quarterly_mark_ic": 0.3333333333333334,
+    "net_sharpe_15bps": 0.10001292580699019
+  },
+  {
+    "set": "microstructure",
+    "n_inputs": 8,
+    "n_free_params": 85,
+    "rmse": 21.429656458405738,
+    "mae": 16.298601384260426,
+    "pooled_rank_ic": 0.1858696202581718,
+    "monthly_mark_ic": 0.18506493506493513,
+    "quarterly_mark_ic": -0.3571428571428572,
+    "net_sharpe_15bps": 1.6457549793060138
+  },
+  {
+    "set": "fundamentals",
+    "n_inputs": 6,
+    "n_free_params": 65,
+    "rmse": 19.017212506925738,
+    "mae": 14.47115950979616,
+    "pooled_rank_ic": -0.01285009327660203,
+    "monthly_mark_ic": 0.01623376623376624,
+    "quarterly_mark_ic": -0.5000000000000001,
+    "net_sharpe_15bps": -0.36779614586540654
+  },
+  {
+    "set": "full",
+    "n_inputs": 11,
+    "n_free_params": 115,
+    "rmse": 24.552611063399464,
+    "mae": 19.13796106731102,
+    "pooled_rank_ic": 0.0321922804597637,
+    "monthly_mark_ic": 0.03571428571428569,
+    "quarterly_mark_ic": -0.36904761904761907,
+    "net_sharpe_15bps": 0.8765754561718764
+  }
+]

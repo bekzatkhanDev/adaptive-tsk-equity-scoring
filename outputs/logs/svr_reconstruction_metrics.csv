@@ -1,0 +1,2 @@
+alpha,mask_rate,scope,n_train,n_test,r2_unmasked,r2_masked,r2_shuffled_control
+0.05,0.0,pre_agm_only,205,208,0.2161568391565183,0.21155923816363909,-0.1393283206960778

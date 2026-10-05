@@ -1,0 +1,12 @@
+[
+  {
+    "alpha": 0.05,
+    "mask_rate": 0.0,
+    "scope": "pre_agm_only",
+    "n_train": 205,
+    "n_test": 208,
+    "r2_unmasked": 0.2161568391565183,
+    "r2_masked": 0.21155923816363909,
+    "r2_shuffled_control": -0.1393283206960778
+  }
+]

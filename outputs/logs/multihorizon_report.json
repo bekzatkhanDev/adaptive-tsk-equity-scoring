@@ -1,0 +1,83 @@
+{
+  "horizons": [
+    {
+      "horizon_days": 5,
+      "n_labelled": 1687,
+      "rmse": 16.380342673808112,
+      "mae": 11.580315571912141,
+      "pooled_rank_ic": -0.05734293279076443,
+      "per_asset_mean_rank_ic": -0.03118634477555639,
+      "ols_pooled_rank_ic": 0.08569443446210968
+    },
+    {
+      "horizon_days": 21,
+      "n_labelled": 1575,
+      "rmse": 17.209069955736048,
+      "mae": 12.660983614534274,
+      "pooled_rank_ic": -0.014598458943817208,
+      "per_asset_mean_rank_ic": -0.006882036000240808,
+      "ols_pooled_rank_ic": -0.06679212511506322
+    },
+    {
+      "horizon_days": 30,
+      "n_labelled": 1512,
+      "rmse": 18.22986363714964,
+      "mae": 13.573011333769397,
+      "pooled_rank_ic": -0.012643829880546919,
+      "per_asset_mean_rank_ic": -0.010565906782818152,
+      "ols_pooled_rank_ic": -0.031028447587910405
+    },
+    {
+      "horizon_days": 63,
+      "n_labelled": 1281,
+      "rmse": 21.48422729114473,
+      "mae": 16.10487149084545,
+      "pooled_rank_ic": -0.014455632528579834,
+      "per_asset_mean_rank_ic": -0.03344705391340154,
+      "ols_pooled_rank_ic": 0.0018192926194799549
+    },
+    {
+      "horizon_days": 252,
+      "n_labelled": 0,
+      "rmse": NaN,
+      "mae": NaN,
+      "pooled_rank_ic": NaN,
+      "per_asset_mean_rank_ic": NaN,
+      "ols_pooled_rank_ic": NaN
+    }
+  ],
+  "marks": [
+    {
+      "mark": "weekly",
+      "horizon_days": 5,
+      "aggregation": "mean",
+      "n_periods": 51,
+      "mean_rank_ic": -0.025210084033613453,
+      "se": 0.05404130182155207
+    },
+    {
+      "mark": "monthly",
+      "horizon_days": 21,
+      "aggregation": "mean",
+      "n_periods": 11,
+      "mean_rank_ic": 0.27922077922077926,
+      "se": 0.1169552447004616
+    },
+    {
+      "mark": "quarterly",
+      "horizon_days": 63,
+      "aggregation": "mean",
+      "n_periods": 3,
+      "mean_rank_ic": 0.3333333333333334,
+      "se": 0.15198982541432984
+    },
+    {
+      "mark": "annual",
+      "horizon_days": 252,
+      "aggregation": "mean",
+      "n_periods": 0,
+      "mean_rank_ic": NaN,
+      "se": NaN
+    }
+  ]
+}

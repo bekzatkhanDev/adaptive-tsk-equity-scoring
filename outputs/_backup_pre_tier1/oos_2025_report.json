@@ -1,0 +1,123 @@
+{
+  "n_train_rows": 1575,
+  "n_train_days": 229,
+  "n_test_rows": 1722,
+  "n_test_days": 246,
+  "tsk": {
+    "n_labelled": 1512,
+    "rmse": 18.242402769521487,
+    "mae": 13.581810319275283,
+    "pooled_rank_ic": -0.014578942620408094,
+    "n_rules": 5,
+    "n_free_params": 35,
+    "n_total_params": 50,
+    "conditioning": {
+      "train": {
+        "rule_output_max_abs": 97.45450086236804,
+        "rule_output_mean_abs": 36.357328462601686,
+        "empirical_C": 95.42225798447043,
+        "bias_bound_with_realised_C": 0.05963891124029403
+      },
+      "test": {
+        "rule_output_max_abs": 93.96920755286608,
+        "rule_output_mean_abs": 36.44899841497964,
+        "empirical_C": 88.51602953561493,
+        "bias_bound_with_realised_C": 0.05532251845975934
+      },
+      "prop1_bound_nominal_C100": 0.06250000000000001,
+      "prop1_assumption_holds": true
+    },
+    "masked_path": {
+      "alpha": 0.05,
+      "draws": 25,
+      "n_masked_rows": 208,
+      "mean_abs_delta_on_pre_agm": 0.10154162496438182,
+      "mean_signed_bias": -0.00010817368193406802,
+      "mean_abs_bias": 0.006742911103598296,
+      "pooled_rank_ic_mean": -0.014625023838410753,
+      "pooled_rank_ic_sd": 0.0004130274626466246,
+      "rmse_mean": 18.24299927886052,
+      "rmse_sd": 0.001594422085975114,
+      "net_sharpe_base_mean": 0.3343688302350787,
+      "net_sharpe_base_sd": 0.34867414964158805
+    },
+    "pooled_rank_ic_ci95": [
+      -0.06604573109580775,
+      0.06244945706074164
+    ],
+    "daily_rank_ic_per_asset": {
+      "AIRA": 0.0073,
+      "KCEL": -0.0137,
+      "KEGC": 0.0643,
+      "KMGZ": -0.0006,
+      "KZAP": -0.1052,
+      "KZTK": -0.016,
+      "KZTO": -0.014
+    },
+    "daily_rank_ic_panel_mean": -0.011132885262131855,
+    "monthly_rank_ic_mean": 0.09090909090909093,
+    "monthly_rank_ic_se": 0.09465830998125489,
+    "net_sharpe_by_cost_bps": {
+      "15": 0.10001292580699019,
+      "25": 0.04969765230290382,
+      "35": -0.0006176212011824053,
+      "50": -0.07609053145731204
+    },
+    "net_sharpe_base_ci95": [
+      -3.237266795621405,
+      1.9183569113437484
+    ]
+  },
+  "ols": {
+    "n_labelled": 1512,
+    "rmse": 17.63770943542485,
+    "mae": 13.373908225155397,
+    "pooled_rank_ic": -0.031028447587910405,
+    "n_params": 4,
+    "net_sharpe_by_cost_bps": {
+      "15": 0.9171027929735386,
+      "25": 0.8777865227458449,
+      "35": 0.8384702525181513,
+      "50": 0.7794958471766109
+    }
+  },
+  "monthly_rank_ic_per_month": {
+    "2025-01-05": 0.2857,
+    "2025-02-03": 0.0,
+    "2025-03-03": 0.4286,
+    "2025-04-01": 0.25,
+    "2025-05-02": 0.2857,
+    "2025-06-02": -0.25,
+    "2025-07-01": 0.0,
+    "2025-08-01": -0.0714,
+    "2025-09-02": -0.6071,
+    "2025-10-01": 0.3214,
+    "2025-11-03": 0.3571
+  },
+  "portfolio_picks": [
+    "KCEL,KZTK,KZTO",
+    "KCEL,KZTK,KZTO",
+    "KCEL,KZTK,KZTO",
+    "KCEL,KEGC,KZTK",
+    "AIRA,KCEL,KEGC",
+    "KCEL,KEGC,KZTO",
+    "KCEL,KMGZ,KZTO",
+    "AIRA,KEGC,KZTO",
+    "KEGC,KZTK,KZTO",
+    "KCEL,KMGZ,KZAP",
+    "AIRA,KZAP,KZTK"
+  ],
+  "ols_portfolio_picks": [
+    "KCEL,KEGC,KMGZ",
+    "KCEL,KZTK,KZTO",
+    "AIRA,KMGZ,KZTK",
+    "KCEL,KEGC,KZTK",
+    "KEGC,KZAP,KZTK",
+    "AIRA,KMGZ,KZAP",
+    "KMGZ,KZAP,KZTK",
+    "KMGZ,KZTK,KZTO",
+    "KCEL,KZAP,KZTK",
+    "AIRA,KCEL,KZAP",
+    "AIRA,KMGZ,KZAP"
+  ]
+}

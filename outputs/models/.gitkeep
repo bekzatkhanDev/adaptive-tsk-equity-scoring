@@ -1,0 +1,2 @@
+Model checkpoints (TSK / ANFIS parameters, JSON) are written here by
+src/anfis_trainer.py and the training scripts in experiments/.

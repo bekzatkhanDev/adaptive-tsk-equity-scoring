@@ -1,0 +1,18 @@
+# Core numerical stack (validated on Python 3.13, numpy 2.x, pandas 3.x)
+numpy>=2.0
+pandas>=2.2
+scipy>=1.11
+
+# Config + reporting
+PyYAML>=6.0
+matplotlib>=3.8
+
+# Only required by experiments/SVR_adversarial_reconstruction.py
+scikit-learn>=1.4
+
+# Not required: the TSK/ANFIS engine is implemented in pure NumPy
+# (no torch / statsmodels dependency).
+#
+# LaTeX toolchain for paper/ (install separately, e.g. MiKTeX or TeX Live):
+#   pdflatex + bibtex, and the Springer Nature template files sn-jnl.cls /
+#   sn-mathphys-num.bst (see paper/README note inside main.tex).

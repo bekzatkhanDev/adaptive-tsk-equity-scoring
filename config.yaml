@@ -1,0 +1,147 @@
+# ---------------------------------------------------------------------------
+# Adaptive TSK Equity Scoring -- master configuration
+# Mirrors the methodology of paper/sn-article-template/name.tex (camera-ready).
+# All paths are relative to the project root (this file's directory).
+# ---------------------------------------------------------------------------
+project:
+  name: adaptive-tsk-equity-scoring
+  seed: 20250921
+
+paths:
+  raw_ohlc: data/raw/ohlc                    # one Investing.com CSV per ticker
+  # Per-year financials exports; {year} is expanded from data.financials_years.
+  raw_financials_pattern: data/raw/financials/financials-{year}.csv
+  raw_dividends: data/raw/financials/dividends.csv   # optional; zeros if absent
+  raw_tonia: data/raw/macro/tonia_rbk.xlsx   # daily TONIA close (RBK export)
+  raw_fx: data/raw/macro/rate_nbk.xlsx       # daily USD/KZT reference rate (NBK)
+  processed: data/processed
+  models: outputs/models
+  logs: outputs/logs
+  csv_exports: outputs/csv_exports
+  paper: paper/sn-article-template           # official sn-jnl template dir
+
+data:
+  # The seven KASE equities studied in the paper (Section 4.1).
+  tickers: [AIRA, KCEL, KEGC, KMGZ, KZAP, KZTK, KZTO]
+  ohlc_file_pattern: "{ticker}.csv"
+  financials_years: [2024, 2025]             # per-year financials files
+  market_name: KASE
+  trading_days_per_year: 250
+
+features:
+  # Section 3.1 -- strictly trailing windows [t-N, t-1] (no lookahead).
+  vwap_window: 20            # N in VWAP_{t-1}(N)
+  volume_window: 20          # trailing window for the log-volume transform
+  epsilon_volume_rel: 1.0e-6 # epsilon = 1e-6 * Mean(V_N), Eq. (2) regulariser
+  of_mode: hybrid            # clv | tick | hybrid  (Section 3.1 / Algorithm 1)
+  # Winsorise dev_price/dev_volume to training-window percentiles. Estimated on
+  # the training window only and applied to every split, so test-period extremes
+  # (2025 dev_price reaches -38.9% against a 2024 minimum of -11.2%) cannot push
+  # the rule consequents outside the score domain. Without it the fitted model
+  # violates Proposition 1's premise: max|y_k - Y_raw| = 195 > 100.
+  winsorize: true
+  winsor_low_pct: 1.0
+  winsor_high_pct: 99.0
+  # --- Tier-2 enrichment (opt-in; both off by default) -----------------------
+  # Multi-scale microstructure, all trailing/no-lookahead. Any of:
+  # dev_price_60 (60-day VWAP deviation), ret_5 (5-day momentum),
+  # vol_20 (realised vol, lagged), clv_5 (5-day mean CLV), amihud (illiquidity).
+  extra_features: []
+  # As-of (point-in-time) slow fundamentals attached with a reporting lag, so a
+  # calendar day never sees a disclosure that was not yet public.
+  fundamentals: false
+  fundamentals_lag_days: 90
+
+target:
+  horizon: 30                # primary forward horizon in trading days, Eq. (7)
+  # Tier-1 multi-horizon grid (1w / 1m / 1q / 1y in trading days). The primary
+  # horizon above is always included, so R30 / Y_target keep their canonical
+  # meaning while R5, R21, R63, R252 feed the multi-horizon / period-mark report.
+  horizons: [5, 21, 63, 252]
+  label_mode: tanh           # tanh (Eq. 10) | rank (cross-sectional percentile in [0,100])
+  peer_relative: false       # if true, demean R_h within each date before the tanh label
+  aggregation: mean          # period-mark aggregation: mean | median | last | ewma
+  tanh_scale: 15.0           # numerator of Eq. (10): 50[1+tanh(scale/50 * Z)]
+  score_scale: 100.0         # Y_attr in [0, 100]
+  neutral_score: 50.0        # returned when total firing strength < 1e-8
+  firing_floor: 1.0e-8       # sum-w threshold below which the neutral score fires
+  sigma_floor: 1.0e-4        # delta: numerical floor on Gaussian widths, Eq. (5)
+
+experiment:
+  # Train on 2024, evaluate strictly out-of-sample on the full 2025 calendar
+  # year -- the paper's canonical test window (Section 3.3.1). The raw bars now
+  # cover 2024-01-03..2025-12-31; extending the training history back to 2022
+  # only requires adding those bars and moving train_start.
+  train_start: "2024-01-01"  # canonical (paper): "2022-01-01"
+  train_end: "2024-12-31"    # canonical (paper): "2024-12-31"
+  test_start: "2025-01-01"   # canonical (paper): "2025-01-01"
+  test_end: "2025-12-31"     # canonical (paper): "2025-12-31"
+  # Pre-AGM window length M_pre in calendar days, Section 3.4.
+  pre_agm_days: 45
+  # AGM dates (YYYY-MM-DD) used to arm the masking window; lists are supported
+  # so the training year carries Pre-AGM rows as well. The 2024 dates reuse the
+  # 2025 month/day as a documented approximation -- replace with the exact KASE
+  # disclosure dates when available.
+  agm_dates:
+    KMGZ: ["2024-05-16", "2025-05-16"]
+    KZAP: ["2024-05-22", "2025-05-22"]
+    KEGC: ["2024-05-14", "2025-05-14"]
+    KZTO: ["2024-05-15", "2025-05-15"]
+    KCEL: ["2024-06-13", "2025-06-13"]
+    AIRA: ["2024-06-20", "2025-06-20"]
+    KZTK: ["2024-05-29", "2025-05-29"]
+
+tsk:
+  # Section 3.2 -- subtractive clustering on min-max normalised inputs.
+  # experiments/tune_tsk.py scans this block on the internal chronological split
+  # (fit 2024-H1, validate 2024-H2, maximise validated Rank IC s.t. C <= 100).
+  # The scan PREFERRED K=5/radius=0.4/ridge=1.0 (validation IC +0.102 at C=74.6,
+  # vs +0.071 at C=59.4 here) but that choice did NOT hold out-of-sample: on the
+  # 2025 test year it lowered pooled Rank IC (-0.023 vs -0.015), flipped the net
+  # Sharpe at 15 bps negative (-0.174 vs +0.100), and -- most importantly --
+  # destroyed the adversarial-hardening property (SVR masked R^2 +0.214 vs
+  # unmasked 0.209, i.e. masking stopped protecting, against -0.027 vs 0.268
+  # here). The in-sample-preferred setting is therefore rejected and the original,
+  # out-of-sample-validated parameters are retained.
+  n_rules: 5                 # K = 5 (fixated after the sensitivity scan)
+  cluster_radius: 0.5        # subtractive-clustering influence radius
+  cluster_ratio: 0.5         # squash factor for the potential update
+  mf: gaussian
+  # Ridge penalty on the consequent least-squares solve (Eq. 9), selected on an
+  # internal chronological split of the training year only (fit on 2024-H1,
+  # validate on 2024-H2, maximise validated rank IC subject to C <= 100).
+  # A tiny value leaves the solve ill-conditioned: rule outputs then reach
+  # |y_k| ~ 6e3 with cancelling signs, which inflates the masking cost by two
+  # orders of magnitude. See the note above for why the scan's ridge=1.0 pick is
+  # rejected.
+  ridge_lambda: 10.0
+  # Bound each rule output to the score domain at inference (default true). This
+  # makes Proposition 1's constant C = max|y_k - Y_raw| <= 100 hold by
+  # construction for any ridge value and any input extrapolation; the training
+  # gradients are unaffected because predict() stays unclipped.
+  clip_rule_outputs: true
+  # Input scaling: "raw" (identity, canonical three-input model) or "minmax"
+  # (train-fitted [0, 1] scaling). Use "minmax" whenever heterogeneous Tier-2
+  # inputs (e.g. fundamentals) share the vector with dev_price.
+  input_scaling: raw
+  premise_lr: 1.0e-3         # eta, backward pass (widths only), Eq. (11)
+  epochs: 200
+  grad_clip: 5.0
+  verbose_every: 25
+
+masking:
+  # Section 3.4 -- anti-frontrunning stochastic rule-weight masking.
+  alpha: 0.05                # truncation bound; xi ~ N(0, (alpha/2)^2) on [-a, a]
+
+payout:
+  # Section 4.1, Eqs. (12)-(13) -- corporate payout mapping.
+  kappa: 3.0                 # leverage penalty intensity
+  tau: 1.0                   # Net Debt / EBITDA threshold
+
+backtest:
+  # Section 4.3.1 -- monthly top-N long portfolio and cost tiers.
+  top_n: 3
+  rebalance: monthly         # first trading day of each month
+  cost_tiers_bps: [15, 25, 35, 50]   # round-trip execution costs
+  bootstrap_B: 5000          # panel block bootstrap replications
+  bootstrap_block: 30        # block length in trading days

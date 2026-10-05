@@ -1,0 +1,58 @@
+[
+  {
+    "ticker": "AIRA",
+    "fcfe": 8200,
+    "ND_EBITDA": 3.185567010309278,
+    "Y_attr": 47.59636508072293,
+    "PR_target": 0.0006751778780408092,
+    "PR_target_pct": 0.1
+  },
+  {
+    "ticker": "KCEL",
+    "fcfe": -13400,
+    "ND_EBITDA": 5.428571428571429,
+    "Y_attr": 48.874423628214245,
+    "PR_target": 0.0,
+    "PR_target_pct": 0.0
+  },
+  {
+    "ticker": "KEGC",
+    "fcfe": 22400,
+    "ND_EBITDA": 1.3690807799442897,
+    "Y_attr": 48.021148877833355,
+    "PR_target": 0.1192775030535949,
+    "PR_target_pct": 11.9
+  },
+  {
+    "ticker": "KMGZ",
+    "fcfe": 383000,
+    "ND_EBITDA": 0.6443298969072165,
+    "Y_attr": 49.240111421602414,
+    "PR_target": 0.3663601884723833,
+    "PR_target_pct": 36.6
+  },
+  {
+    "ticker": "KZAP",
+    "fcfe": 285000,
+    "ND_EBITDA": 0.21858298893501685,
+    "Y_attr": 47.89713523596412,
+    "PR_target": 0.4370499513488061,
+    "PR_target_pct": 43.7
+  },
+  {
+    "ticker": "KZTK",
+    "fcfe": -18200,
+    "ND_EBITDA": 0.7965665236051502,
+    "Y_attr": 47.59557021218535,
+    "PR_target": 0.0,
+    "PR_target_pct": 0.0
+  },
+  {
+    "ticker": "KZTO",
+    "fcfe": -23100,
+    "ND_EBITDA": -1.3806146572104019,
+    "Y_attr": 47.88004041262487,
+    "PR_target": 0.0,
+    "PR_target_pct": 0.0
+  }
+]
