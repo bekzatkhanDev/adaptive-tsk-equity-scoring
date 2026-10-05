@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+
+# Logs and output artifacts
+outputs/logs/
