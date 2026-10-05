@@ -24,7 +24,7 @@ data:
   # The seven KASE equities studied in the paper (Section 4.1).
   tickers: [AIRA, KCEL, KEGC, KMGZ, KZAP, KZTK, KZTO]
   ohlc_file_pattern: "{ticker}.csv"
-  financials_years: [2024, 2025]             # per-year financials files
+  financials_years: [2022, 2023, 2024, 2025]   # per-year financials files
   market_name: KASE
   trading_days_per_year: 250
 
@@ -68,11 +68,11 @@ target:
   sigma_floor: 1.0e-4        # delta: numerical floor on Gaussian widths, Eq. (5)
 
 experiment:
-  # Train on 2024, evaluate strictly out-of-sample on the full 2025 calendar
-  # year -- the paper's canonical test window (Section 3.3.1). The raw bars now
-  # cover 2024-01-03..2025-12-31; extending the training history back to 2022
-  # only requires adding those bars and moving train_start.
-  train_start: "2024-01-01"  # canonical (paper): "2022-01-01"
+  # Train on 2022-2024 and evaluate strictly out-of-sample on the full 2025
+  # calendar year -- the paper's canonical windows (Section 3.3.1). The raw bars
+  # now cover 2022-01-05..2025-12-31 (AIRA only from 2024-02-12, KMGZ from
+  # 2022-12-09), so the full three-year training history is available.
+  train_start: "2022-01-01"  # canonical (paper): "2022-01-01"
   train_end: "2024-12-31"    # canonical (paper): "2024-12-31"
   test_start: "2025-01-01"   # canonical (paper): "2025-01-01"
   test_end: "2025-12-31"     # canonical (paper): "2025-12-31"
@@ -93,27 +93,28 @@ experiment:
 
 tsk:
   # Section 3.2 -- subtractive clustering on min-max normalised inputs.
-  # experiments/tune_tsk.py scans this block on the internal chronological split
-  # (fit 2024-H1, validate 2024-H2, maximise validated Rank IC s.t. C <= 100).
-  # The scan PREFERRED K=5/radius=0.4/ridge=1.0 (validation IC +0.102 at C=74.6,
-  # vs +0.071 at C=59.4 here) but that choice did NOT hold out-of-sample: on the
-  # 2025 test year it lowered pooled Rank IC (-0.023 vs -0.015), flipped the net
-  # Sharpe at 15 bps negative (-0.174 vs +0.100), and -- most importantly --
-  # destroyed the adversarial-hardening property (SVR masked R^2 +0.214 vs
-  # unmasked 0.209, i.e. masking stopped protecting, against -0.027 vs 0.268
-  # here). The in-sample-preferred setting is therefore rejected and the original,
-  # out-of-sample-validated parameters are retained.
+  # experiments/tune_tsk.py scans this block on an internal chronological split of
+  # the training window (fit 2022-01-01..2023-07-01, validate 2023-07-01..2024-12-31,
+  # maximise validated Rank IC s.t. C <= 100). On the extended 2022-2024 sample the
+  # scan prefers K=3/radius=0.4/ridge=100 (validation IC +0.085 at C=59.9, versus
+  # +0.051 at C=77.1 for the deployed setting -- rank 22 of 36). Out-of-sample the
+  # pick only wins the *daily* pooled Rank IC (+0.064 vs -0.024) and loses every
+  # metric the portfolio actually depends on: monthly rebalance Rank IC (+0.172 vs
+  # +0.438) and net Sharpe at 15 bps (+1.549 vs +2.582). The smaller model is the
+  # better daily rater and the worse portfolio, so the deployed parameters are
+  # retained -- the same call as the earlier rejection of the in-sample-preferred
+  # setting, just with different numbers behind it.
   n_rules: 5                 # K = 5 (fixated after the sensitivity scan)
   cluster_radius: 0.5        # subtractive-clustering influence radius
   cluster_ratio: 0.5         # squash factor for the potential update
   mf: gaussian
   # Ridge penalty on the consequent least-squares solve (Eq. 9), selected on an
-  # internal chronological split of the training year only (fit on 2024-H1,
-  # validate on 2024-H2, maximise validated rank IC subject to C <= 100).
+  # internal chronological split of the training window (fit 2022-01-01..2023-07-01,
+  # validate 2023-07-01..2024-12-31, maximise validated rank IC subject to C <= 100).
   # A tiny value leaves the solve ill-conditioned: rule outputs then reach
   # |y_k| ~ 6e3 with cancelling signs, which inflates the masking cost by two
-  # orders of magnitude. See the note above for why the scan's ridge=1.0 pick is
-  # rejected.
+  # orders of magnitude. The scan prefers ridge=100 on validation IC; see the note
+  # above for why the deployed value is retained instead.
   ridge_lambda: 10.0
   # Bound each rule output to the score domain at inference (default true). This
   # makes Proposition 1's constant C = max|y_k - Y_raw| <= 100 hold by

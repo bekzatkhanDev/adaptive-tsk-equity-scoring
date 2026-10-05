@@ -27,8 +27,11 @@ import numpy as np
 import pandas as pd
 
 from src.backtest import mark_rank_ic, per_asset_rank_ic, pooled_rank_ic
-from src.data_loader import FEATURE_COLUMNS, build_panel, load_config, target_horizons
+from src.data_loader import build_panel, feature_columns, load_config, target_horizons
 from src.TSK_engine import TSKFuzzySystem
+
+# Config-aware active input vector (canonical three inputs by default).
+FEATURE_COLUMNS = feature_columns(load_config())
 
 # (period alias, matching trading-day horizon) for the mark statistics.
 MARK_PERIODS = [("weekly", 5), ("monthly", 21), ("quarterly", 63), ("annual", 252)]

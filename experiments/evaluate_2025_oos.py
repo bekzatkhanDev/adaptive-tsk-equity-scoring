@@ -31,9 +31,12 @@ from src.backtest import (
     rank_ic,
     top_n_portfolio_returns,
 )
-from src.data_loader import FEATURE_COLUMNS, build_panel, load_config
+from src.data_loader import build_panel, feature_columns, load_config
 from src.masking import masked_scores, prop1_bias_bound
 from src.TSK_engine import TSKFuzzySystem
+
+# Config-aware active input vector (canonical three inputs by default).
+FEATURE_COLUMNS = feature_columns(load_config())
 
 
 def _panel_block_bootstrap_ic(panel: pd.DataFrame, b: int, block: int, seed: int):

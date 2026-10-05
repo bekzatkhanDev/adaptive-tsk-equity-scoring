@@ -53,7 +53,8 @@ python experiments/build_features.py
 # 6. multi-horizon fit + weekly/monthly/quarterly/annual period marks
 python experiments/evaluate_multihorizon.py
 
-# 7. chronological hyper-parameter scan (2024-H1 fit / 2024-H2 validation)
+# 7. chronological hyper-parameter scan (train-window midpoint split:
+#    2022-01-01..2023-07-01 fit / 2023-07-01..2024-12-31 validation)
 python experiments/tune_tsk.py
 
 # 8. Tier-2 feature-set comparison (baseline vs microstructure vs fundamentals)
@@ -103,82 +104,101 @@ Section-3.1 inputs and every existing artifact is unchanged.
   map, leaving the canonical model bit-for-bit unchanged.
 
 `experiments/compare_feature_sets.py` trains the same protocol on each vector.
-Single seed (the published default run):
+Single seed (the published default run, plain training panel):
 
 | Set | Inputs | Free params | Pooled Rank IC | Net Sharpe (15 bps) |
 |---|---|---|---|---|
-| baseline (canonical) | 3 | 35 | −0.013 | 0.100 |
-| **microstructure** | 8 | 85 | **+0.174** | **+1.646** |
-| fundamentals | 6 | 65 | −0.013 | −0.368 |
-| full | 11 | 115 | +0.032 | +0.877 |
+| baseline (canonical) | 3 | 35 | −0.024 | +2.58 |
+| **microstructure** | 8 | 85 | **+0.095** | +2.26 |
+| fundamentals | 6 | 65 | −0.043 | +0.08 |
+| full | 11 | 115 | +0.008 | +1.32 |
 
-`--seeds N` re-trains every set on N i.i.d. row bootstraps of the 2024 training
+`--seeds N` re-trains every set on N i.i.d. row bootstraps of the 2022–2024 training
 panel (seed = `project.seed` shifted by 0..N−1; the test panel is never
 resampled). With N = 5 (`outputs/csv_exports/feature_set_comparison_5seed.csv`):
 
 | Set | Pooled Rank IC (mean ± SE) | Seed spread | Net Sharpe 15 bps (mean ± SE) | Monthly mark IC (mean ± SE) |
 |---|---|---|---|---|
-| baseline | +0.001 ± 0.014 | [−0.035, +0.051] | +0.34 ± 0.27 | +0.21 ± 0.06 |
-| **microstructure** | **+0.126 ± 0.032** | [+0.026, +0.196] | **+1.09 ± 0.35** | +0.14 ± 0.04 |
-| fundamentals | −0.046 ± 0.012 | [−0.072, −0.004] | −0.02 ± 0.13 | +0.07 ± 0.02 |
-| full | +0.013 ± 0.018 | [−0.044, +0.062] | +0.78 ± 0.21 | +0.04 ± 0.03 |
+| baseline | +0.019 ± 0.021 | [−0.047, +0.074] | +1.47 ± 0.25 | +0.19 ± 0.05 |
+| **microstructure** | +0.045 ± 0.009 | [+0.031, +0.082] | **+2.17 ± 0.22** | +0.05 ± 0.02 |
+| fundamentals | −0.041 ± 0.002 | [−0.047, −0.036] | −0.06 ± 0.08 | +0.11 ± 0.01 |
+| full | **+0.049 ± 0.018** | [−0.010, +0.099] | +1.52 ± 0.25 | +0.10 ± 0.03 |
 
-The **multi-scale microstructure set is the one real out-of-sample gain found so
-far**: it beats the baseline on all five training draws (+0.12 vs ≈0 mean pooled
-Rank IC; a bootstrap CI of the difference excludes zero), and the base-tier net
-Sharpe rises from ≈+0.3 to ≈+1.1 — at the cost of more parameters (35 → 85) and
-a looser fit to the Eq. (10) target (RMSE 18.2 → 22.4, the fit-vs-rank trade-off
-the article already discusses). Slow fundamentals alone are *worse than the
-baseline* on every seed, and diluting the vector with them (`full`) collapses
-the microstructure edge back toward zero. The period-mark ICs do **not** improve
-in step (microstructure monthly +0.14 vs baseline +0.21), so the gain is
-horizon-dependent and rests on a single out-of-sample year. Seed-level caveat:
-individual microstructure seeds range +0.03…+0.20, so while the ordering
-(microstructure > full > baseline > fundamentals) is stable across draws, the
-magnitude of the edge is not.
+What survives the three-year retraining:
 
-## Current results (2024 train → full-year 2025 out-of-sample)
+* **Microstructure enrichment is a real, if modest, ranking gain.** Its pooled Rank IC is
+  positive on all five draws (+0.045 ± 0.009 vs the baseline's +0.019 ± 0.021), and on the
+  bootstrap means it also carries the higher Sharpe (+2.17 ± 0.22 vs +1.47 ± 0.25). On the
+  plain single-seed panel the ordering flips (+2.58 baseline vs +2.26 microstructure), so
+  the Sharpe ordering is seed-dependent while the ranking ordering is not. The cost of the
+  extra inputs is a looser fit to the Eq. (10) target (mean RMSE 12.29 → 15.13) and
+  35 → 85 free parameters.
+* **Slow fundamentals remain worthless here** — negative pooled Rank IC on every draw
+  (−0.041 ± 0.002) and a net Sharpe indistinguishable from zero. With three years of
+  disclosure history `ebitda_growth` is finally defined, yet the signal still does not
+  appear.
+* **`full` is no longer worse than `microstructure` on ranking** (it has the highest mean
+  pooled IC, +0.049) but it gives back most of the Sharpe, so mixing fundamentals in buys
+  no ranking and costs return.
+* **Period marks still do not track the pooled IC**: baseline monthly mark IC
+  (+0.19 ± 0.05) beats microstructure (+0.05 ± 0.02) even though microstructure wins on
+  pooled IC. Ranking skill and rebalance-cadence skill are different things.
 
-The raw bars now cover **2024-01-03 → 2025-12-31**, so the paper's canonical **2025
-out-of-sample test window is fully populated** and the reported numbers are real results
-of the pipeline, not plumbing checks. Training uses the 2024 calendar year (1,575 pooled
-asset-days); testing uses all of 2025 (1,722 asset-days over 246 trading days, 1,512 with
-an observable 30-day forward label).
+Caveats: the gains rest on one out-of-sample year (11 monthly rebalances); the
+Deflated Sharpe check over all 20 (4 sets × 5 seeds) trials reports **DSR = 0.00**
+(`SR_obs` 2.45 vs `SR*` 7.53), so the *portfolio-level* edge is not defensibly better
+than chance once the number of configurations tried is accounted for. The ranking edge
+is the defensible claim; the Sharpe edge is not.
+
+## Current results (2022–2024 train → full-year 2025 out-of-sample)
+
+The raw bars now cover **2022-01-05 → 2025-12-31** (AIRA only from 2024-02-12, KMGZ from
+2022-12-09), so training uses the paper's canonical **three-year window**: 4,278 pooled
+asset-days from 2022-02-07 → 2024-12-31 (start trimmed by the feature warm-up). Testing
+uses all of 2025 — 1,722 asset-days over 246 trading days, 1,512 with an observable
+30-day forward label.
 
 | Metric | TSK (CLV) | OLS baseline |
 |---|---|---|
 | Total (free) parameters | 50 (35) | 4 (4) |
-| RMSE / MAE vs. bounded target | 15.17 / 11.89 | 14.99 / 11.78 |
-| Per-asset daily Rank IC (mean ± SE) | 0.136 ± 0.085 | — |
-| Pooled cross-sectional monthly Rank IC | 0.188 ± 0.091 | — |
-| Pooled asset-day Rank IC [95% CI] | 0.047 [−0.055, 0.164] | −0.011 |
-| Net Sharpe, 15 / 25 / 35 / 50 bps | 1.23 / 1.18 / 1.14 / 1.07 | 0.20 / 0.16 / 0.12 / 0.05 |
-| SVR reconstruction R² (Pre-AGM, α=0 → 0.05) | 0.268 → −0.027 | — |
+| RMSE / MAE vs. bounded target | 12.38 / 8.80 | 12.09 / 8.66 |
+| Per-asset daily Rank IC (mean ± SE) | −0.045 ± 0.032 | — |
+| Pooled cross-sectional monthly Rank IC | 0.438 ± 0.062 | — |
+| Pooled asset-day Rank IC [95% CI] | −0.024 [−0.091, 0.078] | −0.046 |
+| Net Sharpe, 15 / 25 / 35 / 50 bps | 2.58 / 2.54 / 2.50 / 2.44 | 0.84 / 0.79 / 0.74 / 0.67 |
+| SVR reconstruction R² (Pre-AGM, α=0 → 0.05) | 0.284 → 0.282 | — |
 
-Caveats: only eleven monthly rebalances exist, so the base-tier Sharpe bootstrap interval
-is wide ([−0.84, 3.59]); monthly re-calibration on a 504-day window is not exercised
-because 2022–2023 bars are still absent.
+Moving from one training year to three materially changes the picture: the model fits the
+bounded target far better (RMSE 15.17 → 12.38) and the **monthly** rebalance signal becomes
+strong (0.438 ± 0.062), while the *daily* pooled Rank IC remains statistically
+indistinguishable from zero (−0.024 [−0.091, 0.078]) and still does not beat OLS as a
+point forecast. The honest summary is therefore: **no daily forecasting skill, clear
+monthly-cross-sectional ranking skill.**
 
-To move to the canonical training window: add 2022–2023 CSVs (same Investing.com format)
-to `data/raw/ohlc/` and set in `config.yaml`:
+Two caveats worth carrying into any write-up:
 
-```yaml
-train_start: "2022-01-01"
-train_end:   "2024-12-31"
-```
+* Only eleven monthly rebalances exist, so the base-tier Sharpe bootstrap interval is wide
+  ([0.67, 5.55]).
+* The SVR reconstruction number (**0.284 → 0.282**) still shows *no* degradation under
+  Pre-AGM masking — i.e. the article's §3.4/§4.4 headline (0.268 → −0.027) remains
+  unreproducible and needs either a mechanism fix or an honest restatement.
 
-No code changes are needed. The AGM dates in `experiment.agm_dates` (lists are supported)
-should likewise be replaced with the exact KASE disclosure dates.
+Walk-forward validation (4 rolling 2025 folds, `outputs/logs/walk_forward_4fold.json`)
+gives baseline DSR 0.82 / microstructure DSR 0.63, consistent with the single OOS run.
+
+> **Paper sync status:** `paper/sn-article-template/name.tex` still carries the previous
+> (2024-only) numbers and needs re-syncing to this run.
 
 ## Verified numerics
 
 * Premise gradients (`log_sigma` and `centers`) match central finite differences to
   **~1e-8 relative error** (log-width parameterisation keeps widths positive and stable).
 * Masking bias matches Proposition 1's bound: worst case `100 * (0.025)^2 = 0.0625`; the
-  α = 0 SVR run reproduces the unmasked R² exactly (0.268), confirming the masking path is
+  α = 0 SVR run reproduces the unmasked R² exactly (0.284), confirming the masking path is
   a no-op when disarmed.
-* Financials parsing is delimiter-agnostic (2024 semicolon / 2025 comma), handles annual
-  `За <year> год` totals alongside Q1–Q4 and H1/H2 legs, and yields 47 tidy rows.
+* Financials parsing is delimiter-agnostic (2022/2023 tab, 2024 semicolon, 2025 comma),
+  handles annual `За <year> год` totals alongside Q1–Q4 and H1/H2 legs, and yields 101
+  tidy rows over 2022–2025.
 
 ## Known environment limitations
 

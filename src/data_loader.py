@@ -142,9 +142,16 @@ _FINANCIAL_RENAME = {
 
 
 def _detect_delimiter(path: Path) -> str:
-    """``;`` for the 2024 export, ``,`` for the 2025 export (header sniff)."""
+    """Header sniff for the per-year exports.
+
+    The exports are inconsistent by year: ``\\t`` for 2022/2023, ``;`` for 2024
+    and ``,`` for 2025, so all three candidates are counted and the most frequent
+    wins (ties fall back to ``,``).
+    """
     header = path.read_text(encoding="utf-8-sig").splitlines()[0]
-    return ";" if header.count(";") > header.count(",") else ","
+    counts = {candidate: header.count(candidate) for candidate in ("\t", ";", ",")}
+    best = max(counts, key=counts.get)
+    return best if counts[best] > 0 else ","
 
 
 def _year_from_text(text) -> int | None:

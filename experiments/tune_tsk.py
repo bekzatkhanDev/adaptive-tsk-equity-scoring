@@ -94,10 +94,15 @@ def main() -> None:
     grid = json.loads(Path(args.grid).read_text()) if args.grid else DEFAULT_GRID
 
     panel = build_panel(cfg, split="train").dropna(subset=["Y_target"])
-    h1 = panel[panel["date"].between(cfg["experiment"]["train_start"], "2024-06-30")]
-    h2 = panel[panel["date"].between("2024-07-01", cfg["experiment"]["train_end"])]
+    train_lo = pd.Timestamp(cfg["experiment"]["train_start"])
+    train_hi = pd.Timestamp(cfg["experiment"]["train_end"])
+    midpoint = train_lo + (train_hi - train_lo) / 2
+    h1 = panel[panel["date"] <= midpoint]
+    h2 = panel[panel["date"] > midpoint]
     if h1.empty or h2.empty:
-        raise SystemExit("need 2024-H1 / 2024-H2 rows -- check the train window and data")
+        raise SystemExit("need early/late training halves -- check the train window and data")
+    print(f"validation split: fit {train_lo.date()}..{midpoint.date()} | "
+          f"validate {midpoint.date() + pd.Timedelta(days=1)}..{train_hi.date()}")
 
     rows = []
     for n_rules, radius, ridge in product(

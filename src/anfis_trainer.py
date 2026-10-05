@@ -37,13 +37,25 @@ class TrainingHistory:
     val_loss: list[float] = field(default_factory=list)
 
     def to_frame(self) -> pd.DataFrame:
+        """Per-epoch diagnostics as a DataFrame.
+
+        ``val_loss`` is only recorded when early stopping is enabled, so the
+        shorter series are aligned to ``train_loss`` by padding with ``NaN``
+        rather than letting the DataFrame constructor reject unequal lengths.
+        """
+        n = len(self.train_loss)
+
+        def align(values: list[float]) -> list[float]:
+            padded = list(values)[:n]
+            return padded + [np.nan] * (n - len(padded))
+
         return pd.DataFrame(
             {
-                "epoch": np.arange(len(self.train_loss), dtype=int),
-                "train_loss": self.train_loss,
-                "gradient_norm": self.gradient_norm,
-                "learning_rate": self.learning_rate,
-                "val_loss": self.val_loss,
+                "epoch": np.arange(n, dtype=int),
+                "train_loss": align(self.train_loss),
+                "gradient_norm": align(self.gradient_norm),
+                "learning_rate": align(self.learning_rate),
+                "val_loss": align(self.val_loss),
             }
         )
 
