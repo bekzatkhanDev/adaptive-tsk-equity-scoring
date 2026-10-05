@@ -102,23 +102,40 @@ Section-3.1 inputs and every existing artifact is unchanged.
   heterogeneous Tier-2 columns share the vector. `raw` (default) is the identity
   map, leaving the canonical model bit-for-bit unchanged.
 
-`experiments/compare_feature_sets.py` trains the same protocol on each vector:
+`experiments/compare_feature_sets.py` trains the same protocol on each vector.
+Single seed (the published default run):
 
 | Set | Inputs | Free params | Pooled Rank IC | Net Sharpe (15 bps) |
 |---|---|---|---|---|
 | baseline (canonical) | 3 | 35 | −0.013 | 0.100 |
-| **microstructure** | 8 | 85 | **+0.186** | **+1.646** |
+| **microstructure** | 8 | 85 | **+0.174** | **+1.646** |
 | fundamentals | 6 | 65 | −0.013 | −0.368 |
 | full | 11 | 115 | +0.032 | +0.877 |
 
+`--seeds N` re-trains every set on N i.i.d. row bootstraps of the 2024 training
+panel (seed = `project.seed` shifted by 0..N−1; the test panel is never
+resampled). With N = 5 (`outputs/csv_exports/feature_set_comparison_5seed.csv`):
+
+| Set | Pooled Rank IC (mean ± SE) | Seed spread | Net Sharpe 15 bps (mean ± SE) | Monthly mark IC (mean ± SE) |
+|---|---|---|---|---|
+| baseline | +0.001 ± 0.014 | [−0.035, +0.051] | +0.34 ± 0.27 | +0.21 ± 0.06 |
+| **microstructure** | **+0.126 ± 0.032** | [+0.026, +0.196] | **+1.09 ± 0.35** | +0.14 ± 0.04 |
+| fundamentals | −0.046 ± 0.012 | [−0.072, −0.004] | −0.02 ± 0.13 | +0.07 ± 0.02 |
+| full | +0.013 ± 0.018 | [−0.044, +0.062] | +0.78 ± 0.21 | +0.04 ± 0.03 |
+
 The **multi-scale microstructure set is the one real out-of-sample gain found so
-far**: pooled Rank IC rises from ≈0 to +0.186 and the base-tier net Sharpe from
-0.10 to 1.65, at the cost of more parameters (35 → 85) and a looser fit to the
-Eq. (10) target (RMSE 18.2 → 21.4, the fit-vs-rank trade-off the article already
-discusses). Slow fundamentals alone add nothing, and diluting the vector with
-them (`full`) *reduces* the microstructure gain. The period-mark ICs do **not**
-improve in step (microstructure monthly +0.19 vs baseline +0.28), so the gain is
-horizon-dependent and rests on a single out-of-sample year.
+far**: it beats the baseline on all five training draws (+0.12 vs ≈0 mean pooled
+Rank IC; a bootstrap CI of the difference excludes zero), and the base-tier net
+Sharpe rises from ≈+0.3 to ≈+1.1 — at the cost of more parameters (35 → 85) and
+a looser fit to the Eq. (10) target (RMSE 18.2 → 22.4, the fit-vs-rank trade-off
+the article already discusses). Slow fundamentals alone are *worse than the
+baseline* on every seed, and diluting the vector with them (`full`) collapses
+the microstructure edge back toward zero. The period-mark ICs do **not** improve
+in step (microstructure monthly +0.14 vs baseline +0.21), so the gain is
+horizon-dependent and rests on a single out-of-sample year. Seed-level caveat:
+individual microstructure seeds range +0.03…+0.20, so while the ordering
+(microstructure > full > baseline > fundamentals) is stable across draws, the
+magnitude of the edge is not.
 
 ## Current results (2024 train → full-year 2025 out-of-sample)
 
