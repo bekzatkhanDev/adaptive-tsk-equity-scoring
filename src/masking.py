@@ -21,6 +21,7 @@ __all__ = [
     "masked_scores",
     "expected_masked_output",
     "prop1_bias_bound",
+    "unlimited_query_bound",
 ]
 
 
@@ -110,6 +111,28 @@ def expected_masked_output(firing: np.ndarray, rule_outputs: np.ndarray) -> np.n
     return (y_raw - correction).ravel()
 
 
+def unlimited_query_bound(alpha: float = 0.05, n_rules: int = 5) -> dict[str, float]:
+    """Formal query-averaging bound for the masking noise (review item 4).
+
+    Each masked response is ``Y_raw + noise`` with ``Var(noise) <= C^2 sigma_xi^2``
+    to first order (Proposition 1 linearisation, ``sigma_xi = alpha / 2``). An
+    adversary averaging ``Q`` independent queries for the same ``x_t`` sees
+    standard error ``<= C sigma_xi / sqrt(Q)``; the required queries to bring
+    that error below ``eps`` score points are ``(C sigma_xi / eps)^2``. With
+    ``C = 100``, ``alpha = 0.05``: one query leaves up to 2.5 score points of
+    noise; averaging 25 queries brings it below 0.5 points. Masking is
+    therefore *obfuscation with a quantified query budget*, not security
+    against an unlimited-query adversary -- the paper's Section 3.4 remark.
+    """
+    sigma_xi = alpha / 2.0
+    return {
+        "alpha": float(alpha),
+        "sigma_xi": float(sigma_xi),
+        "single_query_noise_cap": 100.0 * sigma_xi,
+        "queries_to_half_point": float((100.0 * sigma_xi / 0.5) ** 2),
+        "queries_to_tenth_point": float((100.0 * sigma_xi / 0.1) ** 2),
+        "n_rules": int(n_rules),
+    }
 def prop1_bias_bound(alpha: float = 0.05, c: float = 100.0) -> float:
     """Proposition 1 worst-case bias ``C * (alpha/2)^2`` on the [0, 100] scale."""
     return c * (alpha / 2.0) ** 2

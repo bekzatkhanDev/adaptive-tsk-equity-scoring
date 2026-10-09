@@ -30,6 +30,7 @@ from src.backtest import (
     pooled_rank_ic,
     rank_ic,
     top_n_portfolio_returns,
+    turnover_report,
 )
 from src.data_loader import build_panel, feature_columns, load_config
 from src.masking import masked_scores, prop1_bias_bound
@@ -67,6 +68,17 @@ def _sharpe_bootstrap_ci(portfolio: pd.DataFrame, cost_bps: float, b: int, seed:
     return float(low), float(high)
 
 
+def _sanitize(obj):
+    """Recursively map NaN/inf floats to None so the JSON report is strict."""
+    if isinstance(obj, float):
+        return obj if np.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize(v) for v in obj]
+    return obj
+
+
 def fit_metrics(scored: pd.DataFrame) -> dict:
     """RMSE / MAE against the bounded target and pooled Rank IC vs forward returns."""
     labelled = scored.dropna(subset=["Y_target"])
@@ -90,6 +102,19 @@ def ols_baseline(train: pd.DataFrame, test: pd.DataFrame) -> tuple[pd.DataFrame,
         Y_attr=beta[0] + test[list(FEATURE_COLUMNS)].to_numpy(dtype=float) @ beta[1:]
     )
     return scored, beta
+
+
+def naive_baselines(test: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Zero-parameter baselines on the shared test panel (review item 3).
+
+    * ``carry`` -- ranks by last month's realised forward return (persistence);
+    * ``equal`` -- constant score (no ranking information; IC ~ 0 by design).
+    Both reuse the test panel's forward returns, so portfolio/IC comparison
+    with TSK and OLS is on strictly identical labels and dates.
+    """
+    scored_carry = test.assign(Y_attr=test["R30"].shift(21).fillna(0.0))
+    scored_equal = test.assign(Y_attr=50.0)
+    return {"carry": scored_carry, "equal": scored_equal}
 
 
 def conditioning_report(model: TSKFuzzySystem, train: pd.DataFrame, test: pd.DataFrame) -> dict:
@@ -205,19 +230,43 @@ def evaluate(cfg: dict, model: TSKFuzzySystem, train: pd.DataFrame, test: pd.Dat
         b=min(int(cfg["backtest"]["bootstrap_B"]), 2000), seed=1,
     )
 
-    # Baseline on identical features/targets.
+    # Baselines on identical features/targets (OLS) and identical labels/dates
+    # (carry = persistence, equal = no-information); documents the tuning
+    # protocol alongside: TSK hyper-parameters come from experiments/tune_tsk.py
+    # (chronological internal split, maximise validated Rank IC s.t. C <= 100;
+    # deployed K=5/r=0.5/ridge=10 retained after the OOS reversal check), OLS is
+    # closed-form (no hyper-parameters), carry/equal have none by construction.
     ols_scored, beta = ols_baseline(train, test)
     ols_portfolio = top_n_portfolio_returns(ols_scored, top_n=int(cfg["backtest"]["top_n"]))
     ols_tiers = {
         str(bps): net_sharpe(ols_portfolio, cost_bps=bps)
         for bps in cfg["backtest"]["cost_tiers_bps"]
     }
+    naive_reports = {}
+    naive_portfolios = {}
+    for name, naive_scored in naive_baselines(test).items():
+        naive_port = top_n_portfolio_returns(naive_scored, top_n=int(cfg["backtest"]["top_n"]))
+        naive_portfolios[name] = naive_port
+        naive_reports[name] = {
+            **fit_metrics(naive_scored),
+            "monthly_rank_ic": monthly_rank_ic(naive_scored)[:2],
+            "net_sharpe_by_cost_bps": {
+                str(bps): net_sharpe(naive_port, cost_bps=bps)
+                for bps in cfg["backtest"]["cost_tiers_bps"]
+            },
+        }
 
     return {
         "n_train_rows": int(len(train)),
         "n_train_days": int(train["date"].nunique()),
         "n_test_rows": int(len(panel)),
         "n_test_days": int(panel["date"].nunique()),
+        "tuning_protocol": (
+            "TSK hyper-parameters from experiments/tune_tsk.py on a chronological "
+            "internal split of the training window (max validated Rank IC s.t. "
+            "C <= 100); OLS closed-form; carry/equal parameter-free. All models "
+            "share identical training/test splits, features (TSK/OLS) and labels."
+        ),
         "tsk": {
             **fit_metrics(panel),
             "n_rules": int(model.n_rules),
@@ -234,12 +283,15 @@ def evaluate(cfg: dict, model: TSKFuzzySystem, train: pd.DataFrame, test: pd.Dat
             "monthly_rank_ic_se": se_m,
             "net_sharpe_by_cost_bps": tiers,
             "net_sharpe_base_ci95": [sharpe_low, sharpe_high],
+            "turnover": turnover_report(portfolio),
         },
         "ols": {
             **fit_metrics(ols_scored),
             "n_params": int(len(beta)),
             "net_sharpe_by_cost_bps": ols_tiers,
+            "turnover": turnover_report(ols_portfolio),
         },
+        "naive_baselines": naive_reports,
         "monthly_rank_ic_per_month": {str(k.date()): round(v, 4) for k, v in per_month.items()},
         "portfolio_picks": portfolio["picks"].tolist(),
         "ols_portfolio_picks": ols_portfolio["picks"].tolist(),
@@ -268,7 +320,7 @@ def main() -> None:
     scored.to_csv(exports / "oos_scores.csv", index=False)
     portfolio.to_csv(exports / "oos_portfolio.csv", index=False)
     Path(cfg["paths"]["logs"]).joinpath("oos_2025_report.json").write_text(
-        json.dumps(report, indent=2, default=str), encoding="utf-8"
+        json.dumps(_sanitize(report), indent=2, default=str), encoding="utf-8"
     )
 
     if args.ticker:

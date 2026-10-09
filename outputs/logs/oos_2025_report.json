@@ -3,6 +3,7 @@
   "n_train_days": 718,
   "n_test_rows": 1722,
   "n_test_days": 246,
+  "tuning_protocol": "TSK hyper-parameters from experiments/tune_tsk.py on a chronological internal split of the training window (max validated Rank IC s.t. C <= 100); OLS closed-form; carry/equal parameter-free. All models share identical training/test splits, features (TSK/OLS) and labels.",
   "tsk": {
     "n_labelled": 1512,
     "rmse": 12.380527567502645,
@@ -67,7 +68,16 @@
     "net_sharpe_base_ci95": [
       0.6677974780292674,
       5.5534202789615605
-    ]
+    ],
+    "turnover": {
+      "n_rebalances": 11.0,
+      "monthly_turnover_oneway": 0.4666666666666666,
+      "annual_turnover": 5.6,
+      "drag_bps_per_mo_15": 0.0006999999999999999,
+      "drag_bps_per_mo_25": 0.0011666666666666665,
+      "drag_bps_per_mo_35": 0.0016333333333333332,
+      "drag_bps_per_mo_50": 0.002333333333333333
+    }
   },
   "ols": {
     "n_labelled": 1512,
@@ -80,6 +90,49 @@
       "25": 0.788393900488156,
       "35": 0.7395172089547155,
       "50": 0.6662021716545549
+    },
+    "turnover": {
+      "n_rebalances": 11.0,
+      "monthly_turnover_oneway": 0.5666666666666667,
+      "annual_turnover": 6.8,
+      "drag_bps_per_mo_15": 0.00085,
+      "drag_bps_per_mo_25": 0.0014166666666666666,
+      "drag_bps_per_mo_35": 0.001983333333333333,
+      "drag_bps_per_mo_50": 0.002833333333333333
+    }
+  },
+  "naive_baselines": {
+    "carry": {
+      "n_labelled": 1512,
+      "rmse": 52.34469957004911,
+      "mae": 50.96947114317677,
+      "pooled_rank_ic": 0.1698840672099921,
+      "monthly_rank_ic": [
+        0.24603174603174605,
+        0.17571570166189368
+      ],
+      "net_sharpe_by_cost_bps": {
+        "15": 1.6370970402845346,
+        "25": 1.6191335416990174,
+        "35": 1.6011700431135008,
+        "50": 1.5742247952352253
+      }
+    },
+    "equal": {
+      "n_labelled": 1512,
+      "rmse": 11.97961504974018,
+      "mae": 8.65127803800936,
+      "pooled_rank_ic": null,
+      "monthly_rank_ic": [
+        null,
+        null
+      ],
+      "net_sharpe_by_cost_bps": {
+        "15": -2.910860055322972,
+        "25": -2.910860055322972,
+        "35": -2.910860055322972,
+        "50": -2.910860055322972
+      }
     }
   },
   "monthly_rank_ic_per_month": {

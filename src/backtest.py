@@ -24,6 +24,9 @@ __all__ = [
     "top_n_spread_returns",
     "top_n_portfolio_returns",
     "net_sharpe",
+    "turnover_report",
+    "mean_se",
+    "t_ci95",
     "deflated_sharpe_ratio",
     "period_marks",
     "mark_rank_ic",
@@ -186,6 +189,52 @@ def top_n_spread_returns(
                      ",".join(sorted(shorts["ticker"])),
         })
     return pd.DataFrame(rows)
+
+
+def turnover_report(portfolio: pd.DataFrame) -> dict[str, float]:
+    """Realised turnover and per-tier monthly cost drag of a rebalance ledger.
+
+    Membership change per rebalance is the symmetric difference of the pick
+    sets; one-way monthly turnover is half of that (each rotation sells one
+    name and buys another). Annual turnover annualises the monthly figure;
+    ``drag_bps_{bps}`` is the monthly return haircut at that round-trip tier.
+    """
+    membership = [set(p.split(",")) for p in portfolio["picks"]]
+    changes = [
+        len(membership[i] ^ membership[i - 1]) / max(len(membership[i]), 1)
+        for i in range(1, len(membership))
+    ]
+    monthly_oneway = float(np.mean(changes)) / 2.0 if changes else 0.0
+    out: dict[str, float] = {
+        "n_rebalances": float(len(portfolio)),
+        "monthly_turnover_oneway": monthly_oneway,
+        "annual_turnover": monthly_oneway * 12.0,
+    }
+    for bps in (15, 25, 35, 50):
+        out[f"drag_bps_per_mo_{bps}"] = monthly_oneway * bps / 1e4
+    return out
+
+
+def mean_se(values: np.ndarray) -> tuple[float, float]:
+    """Mean and classical standard error of a finite sample (NaN if < 2)."""
+    vals = np.asarray(values, dtype=float)
+    vals = vals[np.isfinite(vals)]
+    if len(vals) < 2:
+        return (float(np.mean(vals)) if len(vals) else float("nan"), float("nan"))
+    return float(vals.mean()), float(vals.std(ddof=1) / np.sqrt(len(vals)))
+
+
+def t_ci95(values: np.ndarray) -> tuple[float, float, float]:
+    """Mean with a two-sided 95% Student-t confidence interval."""
+    vals = np.asarray(values, dtype=float)
+    vals = vals[np.isfinite(vals)]
+    if len(vals) < 2:
+        return (float(np.mean(vals)) if len(vals) else float("nan"),
+                float("nan"), float("nan"))
+    mean = float(vals.mean())
+    se = float(vals.std(ddof=1) / np.sqrt(len(vals)))
+    half = float(stats.t.ppf(0.975, len(vals) - 1) * se)
+    return mean, mean - half, mean + half
 
 
 def deflated_sharpe_ratio(returns: np.ndarray, n_trials: int,
