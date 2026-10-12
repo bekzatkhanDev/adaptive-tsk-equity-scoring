@@ -1,0 +1,204 @@
+{
+  "keff": {
+    "n_rows": 208,
+    "keff_median": 1.4035115902279565,
+    "keff_mean": 1.6618863368570895,
+    "keff_max": 2.9983216024401607,
+    "lambda_median": 0.1314946236508743,
+    "note": "K_eff=1 concentrated .. K_eff=K dispersed; Lambda->0 kills masking",
+    "scope": "test pre-AGM"
+  },
+  "variance": {
+    "rows": [
+      {
+        "alpha": 0.01,
+        "emp_sd_median": 0.009469717008302595,
+        "pred_sd_median": 0.009690665293863504,
+        "ratio_median": 0.995424826371442,
+        "corr": 0.9970976319884938
+      },
+      {
+        "alpha": 0.05,
+        "emp_sd_median": 0.04834662133362651,
+        "pred_sd_median": 0.04845332646931752,
+        "ratio_median": 0.9971240946122386,
+        "corr": 0.9979682538749067
+      },
+      {
+        "alpha": 0.1,
+        "emp_sd_median": 0.09751524815643987,
+        "pred_sd_median": 0.09690665293863504,
+        "ratio_median": 1.0020028105206897,
+        "corr": 0.9972916023407107
+      },
+      {
+        "alpha": 0.2,
+        "emp_sd_median": 0.19432530238804613,
+        "pred_sd_median": 0.19381330587727008,
+        "ratio_median": 1.0196906217886808,
+        "corr": 0.9967738407115436
+      }
+    ],
+    "draws": 500,
+    "note": "ratio~=1.00 validates Eq. (17) with the truncation-calibrated variance; without kappa the ratio is 0.77"
+  },
+  "adversary": {
+    "r2_unmasked": 0.5333373309363599,
+    "r2_fixed": 0.53015161544642,
+    "r2_adaptive": 0.3769191318549019,
+    "adaptive_alpha_median": 1.0,
+    "adaptive_alpha_cap_rate": 0.7723970944309927,
+    "adaptive_bias_signed": -0.3126378796886194,
+    "adaptive_bias_abs": 0.9722382324900097,
+    "epsilon": 2.0,
+    "alpha_max": 1.0
+  },
+  "keyed_adversary": {
+    "r2_keyed_q1": 0.4534907520506817,
+    "r2_keyed_repeated_q25": 0.4534907520506817,
+    "note": "Q=25 repeats the same keyed response, so averaging is identical to Q=1",
+    "signed_bias": -0.15475760739125585,
+    "mean_abs_perturbation": 1.0101039272933916
+  },
+  "per_row": {
+    "matched_alpha": 1.0,
+    "adaptive_noise_sd_pooled": 1.7502051432365866,
+    "matched_noise_sd_pooled": 1.5413588980899013,
+    "s_t_median_train": 4.332150118276078,
+    "buckets": {
+      "low_S_concentrated": {
+        "n": 70,
+        "s_t_median": 0.00047093911801945323,
+        "keff_median": 1.0009286391427064,
+        "adaptive_cap_rate": 0.9857142857142858,
+        "schemes": {
+          "clean": {
+            "noise_sd_mean": 0.0,
+            "abs_err_mean": 0.9841186297732415,
+            "abs_err_p90": 1.9303691804884682,
+            "abs_err_max": 6.312291916712276,
+            "r2": 0.43856099303468987
+          },
+          "fixed_005": {
+            "noise_sd_mean": 0.0020466672715303866,
+            "abs_err_mean": 0.9681757870611114,
+            "abs_err_p90": 1.9463687662794287,
+            "abs_err_max": 6.292528425572797,
+            "r2": 0.44961607258395475
+          },
+          "fixed_matched": {
+            "noise_sd_mean": 0.18306965421856178,
+            "abs_err_mean": 0.8993816305467506,
+            "abs_err_p90": 1.632171139931213,
+            "abs_err_max": 6.481430442671986,
+            "r2": 0.4782826055009559
+          },
+          "adaptive": {
+            "noise_sd_mean": 0.1474095015058316,
+            "abs_err_mean": 0.8660833596953239,
+            "abs_err_p90": 1.7295319569270562,
+            "abs_err_max": 6.499535635466451,
+            "r2": 0.5010922794529151
+          }
+        }
+      },
+      "mid_S": {
+        "n": 69,
+        "s_t_median": 5.029539397462898,
+        "keff_median": 1.4142228352826118,
+        "adaptive_cap_rate": 1.0,
+        "schemes": {
+          "clean": {
+            "noise_sd_mean": 0.0,
+            "abs_err_mean": 1.7323144340909942,
+            "abs_err_p90": 5.697860298926822,
+            "abs_err_max": 6.942041475123617,
+            "r2": -0.38986744173310917
+          },
+          "fixed_005": {
+            "noise_sd_mean": 0.04554797127999882,
+            "abs_err_mean": 1.7165996017809952,
+            "abs_err_p90": 5.675692207083648,
+            "abs_err_max": 6.86577111520495,
+            "r2": -0.37131378294274553
+          },
+          "fixed_matched": {
+            "noise_sd_mean": 1.5425807806366345,
+            "abs_err_mean": 1.7123020618992322,
+            "abs_err_p90": 5.813200702593411,
+            "abs_err_max": 7.4347077010096925,
+            "r2": -0.4573187977290434
+          },
+          "adaptive": {
+            "noise_sd_mean": 1.4867705897133805,
+            "abs_err_mean": 1.7283735399549316,
+            "abs_err_p90": 5.737354772072492,
+            "abs_err_max": 7.457255337159928,
+            "r2": -0.5181781096518261
+          }
+        }
+      },
+      "high_S_dispersed": {
+        "n": 69,
+        "s_t_median": 31.728389464447368,
+        "keff_median": 2.6124320184109564,
+        "adaptive_cap_rate": 0.2753623188405797,
+        "schemes": {
+          "clean": {
+            "noise_sd_mean": 0.0,
+            "abs_err_mean": 2.3485367985638645,
+            "abs_err_p90": 4.730860949358126,
+            "abs_err_max": 6.253985982775163,
+            "r2": -0.12484870678558235
+          },
+          "fixed_005": {
+            "noise_sd_mean": 0.1154547915137605,
+            "abs_err_mean": 2.3858256007492344,
+            "abs_err_p90": 4.7964386199162545,
+            "abs_err_max": 6.305127452212027,
+            "r2": -0.1547830136921564
+          },
+          "fixed_matched": {
+            "noise_sd_mean": 2.8673047326411534,
+            "abs_err_mean": 2.935374329191271,
+            "abs_err_p90": 5.48441173940579,
+            "abs_err_max": 6.953337951936533,
+            "r2": -0.5681276504286987
+          },
+          "adaptive": {
+            "noise_sd_mean": 2.2128220129071674,
+            "abs_err_mean": 2.764507480932091,
+            "abs_err_p90": 5.493720479143029,
+            "abs_err_max": 7.111827314202223,
+            "r2": -0.4907467679598494
+          }
+        }
+      }
+    },
+    "note": "test rows terciled by S_t (low = concentrated firing); attacker = paper's in-window SVR scored against clean test scores (single deployed draw); noise SD over 50 independent masks"
+  },
+  "matched_noise": {
+    "rows": [
+      {
+        "alpha": 0.3,
+        "noise_sd": 0.40039684876717824,
+        "bias_abs": 0.23987653452413735,
+        "r2": 0.521271676850821
+      },
+      {
+        "alpha": 0.6,
+        "noise_sd": 0.8329412962483407,
+        "bias_abs": 0.4955563313952587,
+        "r2": 0.4659860164363031
+      },
+      {
+        "alpha": 1.0,
+        "noise_sd": 1.5413588980899013,
+        "bias_abs": 0.9013989764923115,
+        "r2": 0.3383302016585079
+      }
+    ],
+    "target_sd": 1.5604851684348104,
+    "note": "compare fixed rows at ~= target_sd vs adaptive R^2"
+  }
+}

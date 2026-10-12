@@ -1,0 +1,72 @@
+{
+  "n_months": 11,
+  "subsets_per_month": 35,
+  "dividends_file_present": true,
+  "return_note": "dividend data present",
+  "permutation": {
+    "sharpe_realised": 2.187459993495847,
+    "null_mean": 0.649982130041158,
+    "null_sd": 0.6478086903162786,
+    "p_one_sided": 0.0018,
+    "b": 10000,
+    "realised_monthly_percentile_mean": 0.8025974025974026,
+    "realised_monthly_percentiles": [
+      0.9142857142857143,
+      0.8,
+      0.8,
+      0.6285714285714286,
+      0.8285714285714286,
+      0.7142857142857143,
+      0.8285714285714286,
+      0.9142857142857143,
+      0.6571428571428571,
+      0.9142857142857143,
+      0.8285714285714286
+    ]
+  },
+  "equal_weight_all7": {
+    "net_sharpe": 0.9780360316790029,
+    "mean_monthly_return": 0.01800077376801921,
+    "n_months": 11
+  },
+  "leave_one_out": {
+    "AIRA": {
+      "monthly_ic": 0.4753246753246754,
+      "net_sharpe": 2.1187826826932405
+    },
+    "KCEL": {
+      "monthly_ic": 0.5324675324675326,
+      "net_sharpe": 1.8601074799853516
+    },
+    "KEGC": {
+      "monthly_ic": 0.5948051948051949,
+      "net_sharpe": 2.135145551918595
+    },
+    "KMGZ": {
+      "monthly_ic": 0.4961038961038962,
+      "net_sharpe": 1.7794358462761648
+    },
+    "KZAP": {
+      "monthly_ic": 0.5584415584415585,
+      "net_sharpe": 1.7843493716716041
+    },
+    "KZTK": {
+      "monthly_ic": 0.3714285714285715,
+      "net_sharpe": 1.403233335415475
+    },
+    "KZTO": {
+      "monthly_ic": 0.5168831168831169,
+      "net_sharpe": 2.0510613288077866
+    }
+  },
+  "paired_tsk_vs_ols": {
+    "n_months": 11,
+    "mean_diff": 0.04946724165188383,
+    "paired_t": 2.032178278087838,
+    "paired_t_p": 0.06955095748851108,
+    "wilcoxon_w": 1.0,
+    "wilcoxon_p": 0.0078125,
+    "tsk_sharpe": 2.187459993495847,
+    "ols_sharpe": 0.9918510679793798
+  }
+}

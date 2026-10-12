@@ -1,10 +1,14 @@
 """Chronological hyper-parameter scan for the TSK/ANFIS scorer (Tier-1).
 
-Fits each candidate on 2024-H1 and validates on 2024-H2 -- the internal split the
-config comment commits to -- maximising validated Rank IC subject to
-Proposition 1's premise (empirical ``C = max|y_k - Y_raw| <= 100``). The grid
-spans ``n_rules`` x ``cluster_radius`` x ``ridge_lambda``; the winning feasible
-row is printed as a ready-to-paste ``config.yaml`` fragment.
+Fits each candidate on the early half of the pre-2025 training window and
+validates on its late half -- the internal split the config comment commits to --
+maximising validated Rank IC subject to Proposition 1's premise
+(empirical ``C = max|y_k - Y_raw| <= 100``). This scan is chronological and
+pre-2025, but does not purge the fit--validation boundary; its selected
+hyperparameters may therefore be optimistically affected by overlapping
+forward labels. The grid spans ``n_rules`` x ``cluster_radius`` x
+``ridge_lambda``; the winning feasible row is printed as a ready-to-paste
+``config.yaml`` fragment.
 
 Example
 -------

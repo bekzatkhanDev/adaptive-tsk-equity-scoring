@@ -1,0 +1,161 @@
+{
+  "embargo_trading_days": 30,
+  "frozen_selection_rule": "chronological pre-2025 validation IC (fit early training half, validate late training half; both strictly before 2025), without a fit-validation purge; feasible under empirical C <= 100; the 36-point scan never observes 2025",
+  "frozen_spec": {
+    "n_rules": 3,
+    "cluster_radius": 0.4,
+    "ridge_lambda": 100.0
+  },
+  "deployed_spec": {
+    "n_rules": 5,
+    "cluster_radius": 0.5,
+    "ridge_lambda": 10.0
+  },
+  "n_train_original": 4278,
+  "n_train_purged": 4061,
+  "purge_cutoff": "2024-11-18",
+  "frozen_purged": {
+    "spec": {
+      "n_rules": 3,
+      "cluster_radius": 0.4,
+      "ridge_lambda": 100.0
+    },
+    "monthly_rank_ic": 0.2012987012987013,
+    "monthly_rank_ic_se": 0.11974314727340685,
+    "monthly_rank_ic_per_month": {
+      "2025-01-05": 0.8929,
+      "2025-02-03": 0.0714,
+      "2025-03-03": 0.2143,
+      "2025-04-01": 0.0,
+      "2025-05-02": -0.3571,
+      "2025-06-02": 0.2857,
+      "2025-07-01": -0.1429,
+      "2025-08-01": 0.6071,
+      "2025-09-02": 0.1429,
+      "2025-10-01": 0.7143,
+      "2025-11-03": -0.2143
+    },
+    "monthly_rank_ic_bootstrap_ci95": [
+      -0.012987012987012993,
+      0.4318181818181819
+    ],
+    "pooled_rank_ic": 0.052108802731576545,
+    "pooled_rank_ic_ci95": [
+      -0.01045345884208937,
+      0.13052792303350394
+    ],
+    "rmse": 14.093442909054204,
+    "mae": 9.940886834533904,
+    "net_sharpe_by_cost_bps": {
+      "15": 0.9831236728532781,
+      "25": 0.9649211303877897,
+      "35": 0.9467185879223021,
+      "50": 0.919414774224071,
+      "75": 0.8739084180603518,
+      "100": 0.828402061896633,
+      "150": 0.7373893495691943
+    },
+    "net_sharpe_base_ci95": [
+      -1.4504457943949767,
+      2.518961765481978
+    ],
+    "portfolio_returns": [
+      -0.03525282461634253,
+      -0.024608601482019727,
+      -0.008861804713106124,
+      0.044720061252818376,
+      -0.08581436737261006,
+      0.30782110198446216,
+      0.0626607845118311,
+      0.02052769817437923,
+      0.047409176711631,
+      -0.004232425303977511,
+      0.0012912709049510765
+    ],
+    "portfolio_picks": [
+      "KCEL,KEGC,KZTK",
+      "KCEL,KZTK,KZTO",
+      "KMGZ,KZAP,KZTK",
+      "KCEL,KEGC,KZTK",
+      "KCEL,KEGC,KZTK",
+      "KEGC,KZTK,KZTO",
+      "KEGC,KMGZ,KZTK",
+      "AIRA,KMGZ,KZTO",
+      "KEGC,KZAP,KZTK",
+      "AIRA,KCEL,KZAP",
+      "AIRA,KMGZ,KZTK"
+    ]
+  },
+  "deployed_purged": {
+    "spec": {
+      "n_rules": 5,
+      "cluster_radius": 0.5,
+      "ridge_lambda": 10.0
+    },
+    "monthly_rank_ic": 0.366883116883117,
+    "monthly_rank_ic_se": 0.10844350258775189,
+    "monthly_rank_ic_per_month": {
+      "2025-01-05": 0.3214,
+      "2025-02-03": 0.8571,
+      "2025-03-03": -0.2143,
+      "2025-04-01": 0.3929,
+      "2025-05-02": 0.6429,
+      "2025-06-02": -0.2857,
+      "2025-07-01": 0.7143,
+      "2025-08-01": 0.2857,
+      "2025-09-02": 0.2857,
+      "2025-10-01": 0.3929,
+      "2025-11-03": 0.6429
+    },
+    "monthly_rank_ic_bootstrap_ci95": [
+      0.15584415584415592,
+      0.5551948051948054
+    ],
+    "pooled_rank_ic": 0.06168412828735476,
+    "pooled_rank_ic_ci95": [
+      -0.010769174368837653,
+      0.16380366804861948
+    ],
+    "rmse": 13.758320433906553,
+    "mae": 9.527250553913818,
+    "net_sharpe_by_cost_bps": {
+      "15": 1.9442750490960743,
+      "25": 1.9001621716345183,
+      "35": 1.8560492941729614,
+      "50": 1.7898799779806263,
+      "75": 1.679597784326735,
+      "100": 1.5693155906728433,
+      "150": 1.3487512033650602
+    },
+    "net_sharpe_base_ci95": [
+      -0.12732597489513964,
+      6.000230607933974
+    ],
+    "portfolio_returns": [
+      -0.0378228508759741,
+      0.015333759860424408,
+      -0.06162253580049428,
+      0.044720061252818376,
+      0.09058791739183679,
+      0.02133941972071891,
+      0.10616295662928306,
+      0.07402730930446888,
+      0.04990963113089927,
+      -0.013341117976495039,
+      0.04492211186951268
+    ],
+    "portfolio_picks": [
+      "KCEL,KZAP,KZTK",
+      "AIRA,KMGZ,KZTK",
+      "KCEL,KZAP,KZTO",
+      "KCEL,KEGC,KZTK",
+      "AIRA,KCEL,KZAP",
+      "KCEL,KEGC,KZTO",
+      "AIRA,KMGZ,KZTK",
+      "KCEL,KMGZ,KZAP",
+      "AIRA,KEGC,KMGZ",
+      "AIRA,KMGZ,KZTK",
+      "AIRA,KZTK,KZTO"
+    ]
+  }
+}

@@ -122,7 +122,14 @@ def top_n_portfolio_returns(
         first_day = group["date"].min()
         day_rows = panel[panel["date"] == first_day]
         day_rows = day_rows[day_rows[ret_col].notna()]
-        picks = day_rows.nlargest(top_n, score_col)
+        picks = (
+            day_rows.sort_values(
+                [score_col, "ticker"],
+                ascending=[False, True],
+                kind="mergesort",
+            )
+            .head(top_n)
+        )
         if picks["ticker"].nunique() < top_n:
             continue
         rows.append({
@@ -179,8 +186,17 @@ def top_n_spread_returns(
         day_rows = day_rows[day_rows[ret_col].notna()]
         if day_rows["ticker"].nunique() < 2 * top_n:
             continue
-        longs = day_rows.nlargest(top_n, score_col)
-        shorts = day_rows.nsmallest(top_n, score_col)
+        ranked = day_rows.sort_values(
+            [score_col, "ticker"],
+            ascending=[False, True],
+            kind="mergesort",
+        )
+        longs = ranked.head(top_n)
+        shorts = ranked.sort_values(
+            [score_col, "ticker"],
+            ascending=[True, True],
+            kind="mergesort",
+        ).head(top_n)
         rows.append({
             "date": first_day,
             "portfolio_return": float(longs[ret_col].mean() - shorts[ret_col].mean()),
@@ -277,8 +293,18 @@ def deflated_sharpe_ratio(returns: np.ndarray, n_trials: int,
                                           / (1.0 - skew * sharpe
                                              + ((kurt + 2.0) / 4.0) * sharpe ** 2))
     dsr = float(stats.norm.cdf(t_stat))
-    return {"dsr": dsr, "sharpe_obs": sharpe * np.sqrt(periodicity),
-            "sr_star": sr_star * np.sqrt(periodicity), "t_stat": t_stat}
+    return {
+        "dsr": dsr,
+        "sharpe_obs": sharpe * np.sqrt(periodicity),
+        "sr_star": sr_star * np.sqrt(periodicity),
+        "t_stat": t_stat,
+        "n_observations": int(T),
+        "periodicity": int(periodicity),
+        "skewness": skew,
+        "excess_kurtosis": kurt,
+        "benchmark_sharpe_monthly": 0.0,
+        "trial_variance_source": "Bailey-Lopez de Prado finite-sample correction from the observed monthly return skewness and excess kurtosis; n_trials controls the selection threshold",
+    }
 
 
 def period_marks(

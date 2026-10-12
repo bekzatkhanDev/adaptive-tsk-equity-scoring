@@ -33,7 +33,7 @@ features:
   vwap_window: 20            # N in VWAP_{t-1}(N)
   volume_window: 20          # trailing window for the log-volume transform
   epsilon_volume_rel: 1.0e-6 # epsilon = 1e-6 * Mean(V_N), Eq. (2) regulariser
-  of_mode: hybrid            # clv | tick | hybrid  (Section 3.1 / Algorithm 1)
+  clv_mode: hybrid           # clv | tick | hybrid  (Section 3.1 / Algorithm 1)
   # Winsorise dev_price/dev_volume to training-window percentiles. Estimated on
   # the training window only and applied to every split, so test-period extremes
   # (2025 dev_price reaches -38.9% against a 2024 minimum of -11.2%) cannot push
@@ -95,7 +95,9 @@ tsk:
   # Section 3.2 -- subtractive clustering on min-max normalised inputs.
   # experiments/tune_tsk.py scans this block on an internal chronological split of
   # the training window (fit 2022-01-01..2023-07-01, validate 2023-07-01..2024-12-31,
-  # maximise validated Rank IC s.t. C <= 100). On the extended 2022-2024 sample the
+  # maximise validated Rank IC s.t. C <= 100). This pre-2025 split is not purged
+  # at the fit-validation boundary, so selection may be optimistically affected by
+  # overlapping forward labels. On the extended 2022-2024 sample the
   # scan prefers K=3/radius=0.4/ridge=100 (validation IC +0.085 at C=59.9, versus
   # +0.051 at C=77.1 for the deployed setting -- rank 22 of 36). Out-of-sample the
   # pick only wins the *daily* pooled Rank IC (+0.064 vs -0.024) and loses every
@@ -143,6 +145,6 @@ backtest:
   # Section 4.3.1 -- monthly top-N long portfolio and cost tiers.
   top_n: 3
   rebalance: monthly         # first trading day of each month
-  cost_tiers_bps: [15, 25, 35, 50]   # round-trip execution costs
+  cost_tiers_bps: [15, 25, 35, 50, 75, 100, 150]   # round-trip execution costs
   bootstrap_B: 5000          # panel block bootstrap replications
   bootstrap_block: 30        # block length in trading days

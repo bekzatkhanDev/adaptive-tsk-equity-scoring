@@ -3,38 +3,38 @@
     {
       "horizon_days": 5,
       "n_labelled": 1687,
-      "rmse": 12.422824241811306,
-      "mae": 8.399987487049758,
-      "pooled_rank_ic": -0.003390684050095738,
-      "per_asset_mean_rank_ic": 0.008669357801760674,
-      "ols_pooled_rank_ic": 0.11149060979085633
+      "rmse": 12.400817372646975,
+      "mae": 8.411391018406086,
+      "pooled_rank_ic": 0.025223984679584182,
+      "per_asset_mean_rank_ic": 0.032292886291377436,
+      "ols_pooled_rank_ic": 0.08689995863689282
     },
     {
       "horizon_days": 21,
       "n_labelled": 1575,
-      "rmse": 12.400820714973957,
-      "mae": 8.726971274528534,
-      "pooled_rank_ic": -0.016546650781262717,
-      "per_asset_mean_rank_ic": -0.03576771416531215,
-      "ols_pooled_rank_ic": -0.02139124441499973
+      "rmse": 13.378875588486704,
+      "mae": 9.329047253665536,
+      "pooled_rank_ic": 0.02299481942945845,
+      "per_asset_mean_rank_ic": 0.026043284570465366,
+      "ols_pooled_rank_ic": -0.07547150809059103
     },
     {
       "horizon_days": 30,
       "n_labelled": 1512,
-      "rmse": 12.380527567502645,
-      "mae": 8.80226883068737,
-      "pooled_rank_ic": -0.024281178400365172,
-      "per_asset_mean_rank_ic": -0.04450891634473243,
-      "ols_pooled_rank_ic": -0.04596028235231907
+      "rmse": 13.811324857394046,
+      "mae": 9.633765020260128,
+      "pooled_rank_ic": 0.020595081579455696,
+      "per_asset_mean_rank_ic": 0.008651992930205337,
+      "ols_pooled_rank_ic": -0.1056424736279846
     },
     {
       "horizon_days": 63,
       "n_labelled": 1281,
-      "rmse": 13.844050914567637,
-      "mae": 10.073211169227688,
-      "pooled_rank_ic": -0.03513700325530586,
-      "per_asset_mean_rank_ic": -0.05591908346210354,
-      "ols_pooled_rank_ic": -0.06848281191200811
+      "rmse": 16.645084556056737,
+      "mae": 12.128663264897689,
+      "pooled_rank_ic": -0.03943126797085936,
+      "per_asset_mean_rank_ic": -0.06323912316173798,
+      "ols_pooled_rank_ic": -0.058746510867460466
     },
     {
       "horizon_days": 252,
@@ -52,24 +52,24 @@
       "horizon_days": 5,
       "aggregation": "mean",
       "n_periods": 51,
-      "mean_rank_ic": 0.058823529411764726,
-      "se": 0.06163881298920716
+      "mean_rank_ic": 0.03361344537815127,
+      "se": 0.05612193540282825
     },
     {
       "mark": "monthly",
       "horizon_days": 21,
       "aggregation": "mean",
       "n_periods": 11,
-      "mean_rank_ic": 0.051948051948051965,
-      "se": 0.12459243727398882
+      "mean_rank_ic": 0.2564935064935065,
+      "se": 0.12620643977647283
     },
     {
       "mark": "quarterly",
       "horizon_days": 63,
       "aggregation": "mean",
       "n_periods": 3,
-      "mean_rank_ic": -0.035714285714285775,
-      "se": 0.2834733547569205
+      "mean_rank_ic": -0.10714285714285716,
+      "se": 0.21821789023599245
     },
     {
       "mark": "annual",

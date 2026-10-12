@@ -21,7 +21,7 @@ data/raw/macro/rate_nbk.xlsx                  daily USD/KZT reference rate (NBK;
 panel features: Dev_Price, Dev_Volume, CLV  (FEATURE_COLUMNS)
         │  src/TSK_engine.py       -- K=5 subtractive clustering, Gaussian MFs (Eqs. 5-6)
         │  src/anfis_trainer.py    -- hybrid: LS consequents (Eq. 9) + width GD (Eq. 11)
-        │  src/masking.py          -- Pre-AGM truncated-Gaussian rule masking (Eqs. 14-16)
+        │  src/masking.py          -- Pre-AGM truncated-Gaussian rule masking (Eqs. 14-18)
         ▼
 outputs/models/*.json   outputs/logs/*   outputs/csv_exports/*
         │  src/backtest.py         -- Rank ICs, block bootstrap, top-3 net Sharpe
@@ -144,10 +144,24 @@ What survives the three-year retraining:
   (+0.19 ± 0.05) beats microstructure (+0.05 ± 0.02) even though microstructure wins on
   pooled IC. Ranking skill and rebalance-cadence skill are different things.
 
+Protocol caveat: the original deployed K=5/radius=0.5/ridge=10 result touched
+2025 during selection. The primary re-run freezes the 36-point scan on
+pre-2025 data, but its early/late fit-validation split is not itself purged;
+the 30-trading-day label embargo applies at the final 2024--2025 test
+boundary. The result is recorded in
+`outputs/logs/frozen_oos.json` with the complete ledger in
+`outputs/logs/frozen_tuning.csv`. It gives monthly IC 0.201 (date-clustered
+95% CI [−0.013, 0.432]) and Sharpe 0.983 at 15 bps (0.737 at 150 bps);
+the deployed setting is a sensitivity only (0.367 IC, 1.944 Sharpe).
+
 Caveats: the gains rest on one out-of-sample year (11 monthly rebalances); the
-Deflated Sharpe check over all 20 (4 sets × 5 seeds) trials reports **DSR = 0.00**
-(`SR_obs` 2.45 vs `SR*` 7.53), so the *portfolio-level* edge is not defensibly better
-than chance once the number of configurations tried is accounted for. The ranking edge
+purged-robustness DSR grid (`outputs/logs/purged_robustness.json`, 30-day embargo)
+reports **DSR ≈ 0.0000** at every searched level (36-trial TSK grid, grid × CLV mode,
+grid × mode × feature set, 20 Tier-2 trials; observed 2.216 vs thresholds 3.79–5.27),
+while the single unsearched canonical fit reports **DSR = 0.919** (observed 2.216 vs
+threshold 1.714). This value is not a pre-registered claim: the specification was
+selected after inspecting 2025, so the *searched portfolio-level* edge is not defensibly
+better than chance once the number of configurations tried is accounted for. The ranking edge
 is the defensible claim; the Sharpe edge is not.
 
 ## Current results (2022–2024 train → full-year 2025 out-of-sample)
@@ -160,41 +174,61 @@ uses all of 2025 — 1,722 asset-days over 246 trading days, 1,512 with an obser
 
 | Metric | TSK (CLV) | OLS baseline |
 |---|---|---|
-| Total (free) parameters | 50 (35) | 4 (4) |
-| RMSE / MAE vs. bounded target | 12.38 / 8.80 | 12.09 / 8.66 |
-| Per-asset daily Rank IC (mean ± SE) | −0.045 ± 0.032 | — |
-| Pooled cross-sectional monthly Rank IC | 0.438 ± 0.062 | — |
-| Pooled asset-day Rank IC [95% CI] | −0.024 [−0.091, 0.078] | −0.046 |
-| Net Sharpe, 15 / 25 / 35 / 50 bps | 2.58 / 2.54 / 2.50 / 2.44 | 0.84 / 0.79 / 0.74 / 0.67 |
-| SVR reconstruction R² (Pre-AGM, α=0 → 0.05) | 0.284 → 0.282 | — |
+| Total (free) parameters | 30 (21) | 4 (4) |
+| RMSE / MAE vs. bounded target | 14.09 / 9.94 | 13.53 / 9.63 |
+| Per-asset daily Rank IC (mean ± SE) | −0.009 ± 0.032 | — |
+| Pooled cross-sectional monthly Rank IC | 0.201 ± 0.120 | — |
+| Pooled asset-day Rank IC [95% CI] | +0.052 [−0.010, 0.131] | −0.106 |
+| Net Sharpe, 15 / 25 / 35 / 50 / 75 / 100 / 150 bps | 0.98 / 0.96 / 0.95 / 0.92 / 0.87 / 0.83 / 0.74 | 0.99 / 0.94 / 0.90 / 0.83 / 0.71 / 0.59 / 0.35 |
+| SVR reconstruction fidelity R² (Pre-AGM, α=0 → 0.05, vs. clean scores) | 0.354 → 0.356 [0.355, 0.357] | — |
+| Adaptive masking (ε=2.0) fidelity R² / bias (signed/abs) | 0.288 [0.283, 0.294] / −0.21 / 1.52 | — |
+| Permutation Sharpe p (B=10,000) / equal-weight Sharpe | 0.0018 / 0.98 | — |
+| Paired TSK vs OLS (t p / Wilcoxon p) | 0.070 / 0.0078 | — |
 
-Moving from one training year to three materially changes the picture: the model fits the
-bounded target far better (RMSE 15.17 → 12.38) and the **monthly** rebalance signal becomes
-strong (0.438 ± 0.062), while the *daily* pooled Rank IC remains statistically
-indistinguishable from zero (−0.024 [−0.091, 0.078]) and still does not beat OLS as a
-point forecast. The honest summary is therefore: **no daily forecasting skill, clear
-monthly-cross-sectional ranking skill.**
+The frozen protocol does not establish a monthly signal: the
+**monthly** rebalance estimate is 0.201 ± 0.120, while the *daily* pooled Rank IC remains statistically
+indistinguishable from zero (+0.052 [−0.010, 0.131]) and the model does not beat OLS as a
+point forecast (RMSE 14.09 vs 13.53). The honest summary is therefore: **no identified
+daily or monthly forecasting skill.** Labels are dividend-adjusted since
+`data/raw/financials/dividends.csv` landed (`load_dividends` keeps 26 paid rows;
+cancelled declarations excluded); one event dominates 2025 — the KZTK 26,664.88 KZT/share
+special-dividend record date 2025-05-25 (a Sunday; not a verified exchange ex-date) —
+and any event-concentration claim should be revisited after correcting that source field.
 
 Two caveats worth carrying into any write-up:
 
 * Only eleven monthly rebalances exist, so the base-tier Sharpe bootstrap interval is wide
-  ([0.67, 5.55]).
-* The SVR reconstruction number (**0.284 → 0.282**) still shows *no* degradation under
-  Pre-AGM masking — i.e. the article's §3.4/§4.4 headline (0.268 → −0.027) remains
-  unreproducible and needs either a mechanism fix or an honest restatement.
+  ([1.14, 4.98]).
+* The SVR reconstruction numbers are **fidelity** (scored against the unmasked
+  model, 200-draw means with 95% CIs; `experiments/extraction_audit.py`). Fixed
+  Pre-AGM masking shows *no* degradation (**0.354 → 0.356** [0.355, 0.357]);
+  adaptive masking at ε=2.0 (truncation-calibrated, `κ = 0.7738`, so uncapped
+  rows realise ~1.04×ε) gives **0.288** [0.283, 0.294] (0.339 on the single
+  deployed draw; matched-noise fixed baseline α=0.65: 0.302 [0.298, 0.307]) —
+  at matched pooled noise adaptive is slightly stronger in aggregate, and its
+  per-row advantage is largest exactly where fixed masking starves the
+  lowest-dispersion rows (per-row test: `adaptive_masking.py:per_row_reconstruction`).
+  Two caveats bound the security claim: averaging Q=25 masked queries restores
+  fidelity to 0.353, and an attacker training on clean out-of-window history
+  reaches 0.668 (0.995 tuned) under every masking scheme. The old masked-label
+  figures (0.235/0.250/0.222) were dilution artifacts and are kept in the JSON
+  only as `r2_labels` checks.
 
 Walk-forward validation (4 rolling 2025 folds, `outputs/logs/walk_forward_4fold.json`)
 gives baseline DSR 0.82 / microstructure DSR 0.63, consistent with the single OOS run.
 
-> **Paper sync status:** `paper/sn-article-template/name.tex` still carries the previous
-> (2024-only) numbers and needs re-syncing to this run.
+> **Paper sync status:** `paper/sn-article-template/name.tex` is synced to the
+> M1+M2 revision (fidelity metric, 200-draw CIs, truncation-calibrated adaptive
+> inversion, Propositions 1–2 with remainder/MC validity, per-row test).
 
 ## Verified numerics
 
 * Premise gradients (`log_sigma` and `centers`) match central finite differences to
   **~1e-8 relative error** (log-width parameterisation keeps widths positive and stable).
-* Masking bias matches Proposition 1's bound: worst case `100 * (0.025)^2 = 0.0625`; the
-  α = 0 SVR run reproduces the unmasked R² exactly (0.284), confirming the masking path is
+* Masking bias matches Proposition 1's second-order expansion: worst case
+  `100 * κ * (0.025)^2 = 0.048` plus a `0.013` remainder at α = 0.05 (Monte-Carlo
+  validated up to α = 1.0 in `experiments/truncation_correction.py`); the
+  α = 0 SVR run reproduces the unmasked R² exactly (0.354), confirming the masking path is
   a no-op when disarmed.
 * Financials parsing is delimiter-agnostic (2022/2023 tab, 2024 semicolon, 2025 comma),
   handles annual `За <year> год` totals alongside Q1–Q4 and H1/H2 legs, and yields 101
@@ -205,5 +239,10 @@ gives baseline DSR 0.82 / microstructure DSR 0.63, consistent with the single OO
 * **No LaTeX toolchain installed** — compile the article on Overleaf or any TeX Live
   install; `paper/sn-article-template/` holds the official Springer Nature class files.
 * Financial statements are quarterly/half-year (Q1–Q4, H1/H2) and are mapped to the
-  latest-available reporting period per date (no lookahead); a dividends CSV is optional
-  (`paths.raw_dividends`, currently zeros).
+  latest-available reporting period per date (no lookahead); the dividends file
+  (`paths.raw_dividends`) is now present — 26 paid rows, cancelled declarations excluded —
+  so R30 labels are dividend-adjusted. Board decisions live in
+  `data/raw/financials/actual_decisions.csv` (FY2021–2024 approved singles + policy bands;
+  `load_board_decisions` parses `%`/`N/A`/Cyrillic sentinels) and anchor
+  `experiments/payout_alignment.py` via `_csv_actuals` with the paper-transcribed ranges
+  as fallback.

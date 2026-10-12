@@ -38,7 +38,7 @@
 \begin{document}
 
 %=====================================================================
-\title[Adaptive TSK Framework for Equity Attractiveness]{An Adaptive TSK Fuzzy-Inference Scoring Framework with Intraday Range-Imbalance Masking for Emerging Equity Markets}
+\title[Protocol Integrity and Output Masking in TSK Scoring]{Protocol Integrity and Output Masking in a TSK Scoring Engine: A Negative Result on Emerging-Market Equity Data}
 
 \author[1]{\fnm{Bekzatkhan} \sur{Zhumabekov}}
 \email{bekzatkhan.zhumabekov@gmail.com}
@@ -47,21 +47,21 @@
 
 %=====================================================================
 \abstract{
-Quantitative dividend allocation and asset valuation models often struggle with high-frequency market noise, lack of Level-1 order book data, and speculative exploitation prior to corporate announcements. This paper proposes a first-order Takagi--Sugeno--Kang (TSK) fuzzy inference framework designed to compute a daily investment attractiveness score $Y_{\mathrm{attr}} \in [0, 100]$ using equity price deviations, volume surges, and a close-location-value (CLV) statistic --- the relative position of the close inside the daily high--low range --- in lieu of a full order flow imbalance. We report it strictly as CLV throughout and make no validated claim against true order flow. To reduce lookahead bias and numerical instability during illiquid market regimes, we introduce a non-overlapping historical Volume-Weighted Average Price ($\mathrm{VWAP}$) baseline with logarithmic volume regularization. Furthermore, to safeguard the algorithm against front-running by high-frequency trading (HFT) algorithms during Pre-AGM (Annual General Meeting) windows, a constrained stochastic weight-masking procedure is incorporated into the rule evaluation phase. The masking mechanism is shown to introduce only a bounded second-order bias while increasing the variance of external gradient estimates against a bounded-query adversary. The Adaptive Network-based Fuzzy Inference System (ANFIS) is trained via a hybrid optimization algorithm using a smooth bounded normalization of 30-day forward risk-adjusted returns. Empirical validation uses four years of daily KASE bars (2022--2025, seven equities) with the model trained on the 2022--2024 calendar years ($4{,}278$ pooled asset-days) and evaluated strictly out-of-sample on the complete 2025 calendar year ($1{,}722$ asset-days over $246$ trading days, $1{,}512$ with an observable 30-day forward label). On this window the framework attains a mean per-asset daily Rank IC of $-0.045 \pm 0.032$ SE and a pooled cross-sectional monthly Rank IC of $0.438 \pm 0.062$ SE across the eleven non-overlapping monthly rebalances --- daily ordering power indistinguishable from zero but effective re-ranking at each rebalancing date; the cost-adjusted net Sharpe ratio is $2.58$ at 15 bps round-trip costs ($2.44$ at 50 bps), while a four-parameter OLS baseline on identical features and targets attains $0.84$ and $0.67$. These portfolio magnitudes rest on eleven monthly rebalances and do not survive multiple-testing correction: a deflated-Sharpe check over all $20$ Tier-2 trials returns $\mathrm{DSR} = 0.00$ (observed $2.45$ vs.\ deflated threshold $7.53$). We therefore report a split result: null daily forecasting skill alongside a strong monthly cross-sectional ranking signal that drives the portfolio outcome. Restricting the adversarial protocol to the Pre-AGM windows ($N=205$ training and $N=208$ out-of-sample asset-days), a single-query SVR reconstruction adversary recovers $R^2 = 0.284$ unmasked ($\alpha=0$) and $R^2 = 0.282$ masked ($\alpha=0.05$), against a shuffled-target control of $-0.146$: arming the masking does not reduce reconstruction, because a $5\%$ multiplicative perturbation moves the pre-AGM score by only $0.10$ points on average. What Proposition~\ref{prop:bias} guarantees is a bound on the \emph{bias} of the deployed score, and that guarantee holds: the realised pre-AGM bias is $-0.0013$ signed ($0.0070$ absolute), comfortably inside the $0.0625$ bound.
+We study protocol integrity and rule-weight masking for a TSK scoring engine. The analytical variance identity shows that injected output variance is the realised noise variance $\sigma_\xi^2$ times a row-specific consequent-dispersion scale $S_t$; effective rule count is only an upper-bound diagnostic. A truncation-calibrated dispersion-adaptive mask reaches a target noise floor when the non-negativity cap permits, but remains defense-in-depth. We evaluate seven Kazakhstan Stock Exchange equities with a pre-2025 frozen specification: the 36-point hyperparameter scan uses an early/late chronological split before 2025, but does not purge the fit--validation boundary, so the selection step is not fully leakage-free. A separate 30-trading-day embargo removes labels whose forward windows cross the 2024--2025 test boundary. Under this conditional frozen specification, the 2025 monthly cross-sectional Rank IC is $0.201$ (date-clustered 95\% CI $[-0.013,0.432]$), the 15-bps top-3 Sharpe is $0.98$, and the 150-bps Sharpe is $0.74$. The frozen-model masking audit gives single-seed in-window SVR fidelity $R^2=0.533$ without masking and $0.377$ with dispersion-adaptive masking at $\epsilon=2.0$; keyed repeated-query fidelity is $0.453$ for both $Q=1$ and $Q=25$. These are conditional diagnostics, not a robust security guarantee. The previously deployed, test-informed specification is reported only as a sensitivity. The trial ledger does not contain the per-trial portfolio returns required for a proper deflated-Sharpe calculation, so no 36-trial DSR is claimed. These results do not establish monthly ranking skill or a robust security benefit; they document a negative result with an explicitly qualified selection protocol and quantify a limited masking noise trade-off.
 }
 
-\keywords{TSK Fuzzy Inference, ANFIS, Close-Location Value, Emerging Markets, Anti-Frontrunning, Transaction Cost Sensitivity}
+\keywords{Protocol Integrity, TSK Fuzzy Inference, ANFIS, Output Masking, Model Extraction, Emerging Markets}
 
 \maketitle
 
 %=====================================================================
 \section{Introduction}\label{sec1}
 
-Predicting equity attractiveness for corporate decision-making---such as dynamic dividend payouts, share buybacks, or treasury management---presents a major challenge in financial engineering. Traditional financial models, such as the Gordon Growth Model or standard Capital Asset Pricing Model (CAPM) variants, rely heavily on low-frequency fundamental metrics (e.g., quarterly earnings or balance sheet ratios). Consequently, they fail to capture short-term market microstructure dynamics, liquidity shifts, and buying pressure that manifest prior to corporate board decisions.
+An algorithmic scoring engine can expose proprietary rules through repeated prediction queries. This makes the engine an attack surface for model extraction, independently of whether its scores have trading value. We therefore frame the study as an intellectual-property and protocol-integrity audit, not as a front-running or payout-prediction claim. The security question is narrow and testable: can output noise measurably degrade reconstruction under a stated query and observability model?
 
-Conversely, purely data-driven black-box models (e.g., Deep Neural Networks, LSTM networks, or XGBoost ensembles) often yield high prediction variance, lack mathematical interpretability, and suffer from degradation during sudden regime shifts in emerging equity markets. Moreover, high-frequency Level-1/Level-2 order book depth feeds are frequently unavailable or prohibitively expensive in developing financial exchanges. Finally, predictable algorithmic scoring mechanisms are vulnerable to predatory high-frequency trading (HFT) strategies and quantitative front-running during pre-announcement windows.
+Our answer begins with an analytical result. Proposition~\ref{thm:masking} shows that the variance injected by rule-weight masking equals a weighted consequent-dispersion scale $S_t$ multiplied by the noise variance $\sigma_\xi^2$: the effective number of active rules enters only as an \emph{upper bound} on that variance, so rule concentration alone neither proves nor guarantees suppression --- efficacy at any row is governed by $S_t$ and the noise scale. On the frozen panel, subtractive clustering produces concentrated firing (median $K_{\mathrm{eff}} = 1.40$ of $K = 3$). Inverting the variance identity per observation, with the draw's truncation calibrated out, yields a dispersion-adaptive scheme, but the non-negativity cap binds on $77.2\%$ of rows at $\epsilon=2.0$, so the target is often unreachable. The resulting reconstruction reduction is conditional and modest: the seeded in-window SVR fidelity changes from $0.533$ unmasked to $0.377$ under adaptive masking, while keyed repeated-query fidelity remains $0.453$ for $Q=1$ and $Q=25$.
 
-To address these limitations, this paper introduces a hybrid quantitative framework based on a first-order Takagi--Sugeno--Kang (TSK) fuzzy inference system. The architecture of the overall system pipeline is illustrated in Fig.~\ref{fig:pipeline}.
+We validate the masking claim on a four-year Kazakhstan Stock Exchange panel (2022--2024 training, 2025 strictly out-of-sample), scoring every adversary against the unmasked scores. The full audit uses the frozen $K=3$, radius-$0.4$, ridge-$100$ model: in the single seeded in-window SVR audit, unmasked fidelity is $R^2=0.533$, fixed $\alpha=0.05$ gives $0.530$, and dispersion-adaptive masking at $\epsilon=2.0$ gives $0.377$; keyed masking gives $0.453$ and is unchanged when the same keyed responses are repeated $25$ times. These are conditional single-panel, single-seed diagnostics rather than security guarantees. The frozen model's median $K_{\mathrm{eff}}$ is $1.40$ and its adaptive cap-binding rate is $77.2\%$; the earlier deployed $K=5$ audit is retained only as a sensitivity and is not used for the primary claim. The remaining claims are therefore limited to a variance identity, its truncation-calibrated inversion, and a negative security audit under explicit observability assumptions. The architecture is illustrated in Fig.~\ref{fig:pipeline}.
 
 \begin{figure}[htbp]
 \centering
@@ -75,7 +75,7 @@ To address these limitations, this paper introduces a hybrid quantitative framew
 ]
     \node (data) [block] {Daily OHLCV Data\\\& Macro Rates};
     \node (prep) [process, right=of data] {Preprocessing \&\\CLV Proxy Extractor};
-    \node (anfis) [process, right=of prep] {TSK Inference Engine\\(ANFIS Hybrid Fit)};
+    \node (anfis) [process, right=of prep] {Frozen TSK Inference Engine\\(ANFIS Hybrid Fit)};
     \node (mask) [process, below=of anfis] {Pre-AGM Stochastic\\Weight Masking};
     \node (score) [output, left=of mask] {Attractiveness Score\\$Y_{\mathrm{attr},t} \in [0,100]$};
     \node (payout) [output, left=of score] {Corporate Payout\\Target $PR_{\mathrm{target},t}$};
@@ -86,19 +86,15 @@ To address these limitations, this paper introduces a hybrid quantitative framew
     \draw [arrow] (mask) -- (score);
     \draw [arrow] (score) -- (payout);
 
-    \draw [feedback] (score.north) -- ++(0,0.6) -| node[pos=0.25, above, font=\tiny\sffamily, color=red!70!black] {Monthly Offline Recalibration} (anfis.south);
 \end{tikzpicture}
-\caption{End-to-end system architecture of the adaptive TSK fuzzy-inference framework showing the monthly recalibration feedback loop.}
+\caption{End-to-end architecture of the frozen TSK scoring engine and its optional Pre-AGM masking layer. No recalibration is performed during the 2025 evaluation window.}
 \label{fig:pipeline}
 \end{figure}
 
-The main contributions of this study are fivefold:
+The main contributions of this study are twofold:
 \begin{enumerate}
-    \item \textbf{Data-Efficient Range-Imbalance Proxy:} Integration of historical Volume-Weighted Average Price ($\mathrm{VWAP}$) deviations, logarithmic volume shifts, and a daily-range directional-pressure proxy (a close-location-value statistic) that requires only daily OHLC bars.
-    \item \textbf{Lookahead-Free Preprocessing:} A feature extraction technique using strictly historical trailing windows $[t-N, t-1]$, protecting against division-by-zero anomalies in low-liquidity regimes.
-    \item \textbf{Anti-Frontrunning Stochastic Masking:} A defense-in-depth mechanism that injects bounded Gaussian noise into rule weights during sensitive Pre-AGM windows, shown to introduce negligible second-order bias.
-    \item \textbf{ANFIS Optimization \& Low-Sample Efficiency:} A hybrid training process leveraging subtractive clustering and a smooth bounded normalization of 30-day forward risk-adjusted returns, evaluated strictly out-of-sample with bootstrapped uncertainty bounds.
-    \item \textbf{Tier-2 Enrichment Audit:} A lookahead-free multi-scale microstructure and point-in-time fundamental feature block, benchmarked against the canonical three-input model under five training-bootstrap seeds, showing that the enrichment's value is concentrated in the trailing OHLC block while slow fundamentals and naive stacking degrade ranking performance at this sample scale.
+    \item \textbf{Analytical masking audit:} A truncation-calibrated variance identity and its row-wise inversion, with explicit separation of systematic bias from injected score noise and a negative audit against query averaging and observable out-of-window history.
+    \item \textbf{Reproducible evaluation protocol:} A pre-2025 hyperparameter ledger, a 30-trading-day label embargo, date-clustered uncertainty intervals, and cost sensitivity through 150 bps. No contribution is claimed for predictive finance performance.
 \end{enumerate}
 
 %=====================================================================
@@ -106,24 +102,28 @@ The main contributions of this study are fivefold:
 
 \subsection{Fuzzy Inference Systems in Quantitative Finance}
 
-Fuzzy logic systems, originally introduced by Zadeh \cite{zadeh1965} and expanded into functional inference by Takagi and Sugeno \cite{takagi1985}, have seen extensive application in financial time-series forecasting due to their ability to model non-linear boundaries with human-interpretable linguistic rules. Early fuzzy systems often struggled with high-dimensional and noisy financial data; however, later extensions such as the TSK+ inference framework improved rule coverage and numerical stability \cite{li2018}. More recent surveys emphasize that modern TSK fuzzy systems can be fused in hierarchical, wide, and stacked architectures \cite{zhang2024}. Similarly, evolving TSK models for time-series forecasting have demonstrated strong adaptability when the underlying data distribution changes over time \cite{alves2024}. Within this family, ANFIS remains a standard optimization framework because it combines the interpretability of fuzzy rules with the numerical efficiency of least-squares and gradient-based learning \cite{jang1993}.
+Fuzzy logic systems, originally introduced by Zadeh \cite{zadeh1965} and expanded into functional inference by Takagi and Sugeno \cite{takagi1985}, have seen extensive application in financial time-series forecasting due to their ability to model non-linear boundaries with human-interpretable linguistic rules. The TSK+ paper cited here concerns sparse-rule fuzzy interpolation and rule-base generation, not a general claim of numerical stability on noisy financial data \cite{li2018}. Rubio et al.\ \cite{rubio2021} report ANFIS forecasting with noise-robustness analysis, while the evolving-TSK survey of Skrjanc et al.\ \cite{skrjanc2019} reviews online rule adaptation. Within this family, ANFIS remains a standard optimization framework because it combines interpretable local consequents with least-squares and gradient-based learning \cite{jang1993}.
 
 \subsection{Market Microstructure Proxies in Emerging Markets}
 
-In market microstructure research, Cont et al. \cite{cont2014} established the predictive power of Order Flow Imbalance ($\mathrm{OFI}$) for short-term price dynamics. True $\mathrm{OFI}$ requires event-level bid/ask volumes and is unavailable in most emerging-market daily datasets. A standard fallback is the \emph{close-location value} (CLV), i.e., the relative position of the closing price within the daily high-low range, which is a documented directional-pressure statistic \cite{hasbrouck1991,amihud2002}. In this paper we use CLV as a daily-range directional-pressure proxy. Where intraday quotes are unavailable, a simple tick rule $\mathrm{sgn}(P_t - P_{t-1})$ is used as a fallback when high/low price bounds are missing or corrupted. Note that this simple tick rule differs from the classical Lee--Ready algorithm \cite{leeready1991}, which requires intraday quote midpoints.
+In market microstructure research, Cont et al. \cite{cont2014} established the predictive power of Order Flow Imbalance ($\mathrm{OFI}$) for short-term price dynamics. True $\mathrm{OFI}$ requires event-level bid/ask volumes and is unavailable in most emerging-market daily datasets. We therefore use the classical close-location value (CLV), the relative position of the close within the daily high--low range, as a low-frequency range feature; it is not an independent order-flow measure and no order-flow validation is claimed. Corwin and Schultz \cite{corwin2012} derive bid-ask spread estimators from daily ranges, and Fong et al.\ \cite{fong2017} benchmark low-frequency liquidity proxies against high-frequency standards. Chordia et al.\ \cite{chordia2001} and Fama and French \cite{fama2008} motivate liquidity-aware controls more generally, but do not establish CLV as a directional-pressure statistic. Where intraday quotes are unavailable, a simple tick rule $\mathrm{sgn}(P_t - P_{t-1})$ is used as a fallback; it is correlated with CLV because both depend on the close and is not treated as an independent validation signal. The tick rule also differs from the classical Lee--Ready algorithm \cite{leeready1991}, which requires intraday quote midpoints.
 
 \subsection{Adversarial Robustness and Algorithmic Trading Security}
 
 As algorithmic trading systems become more transparent, they become vulnerable to reverse engineering and predatory strategies. Easley et al. \cite{easley2012} show that high-frequency order flow can create toxicity and liquidity fragility, while Cartea et al. \cite{cartea2015} provide a comprehensive treatment of optimal execution and strategic interaction in algorithmic markets.
 
-The proposed stochastic masking mechanism is also related to adversarial machine learning. Adversarial perturbations can destabilize models at test time \cite{biggio2013}, and small input perturbations can dramatically change the outputs of deep and kernel models \cite{goodfellow2015}. Defensive strategies often rely on randomization, regularization, or adversarial training \cite{kurakin2017}. In contrast to input-level perturbation, our approach randomizes internal rule weights during sensitive corporate-event windows. As discussed in Section~\ref{subsec3_4} (see Remark~\ref{rem:threat_model}), this provides protection against bounded-query adversaries ($Q=1$); we characterize this limitation explicitly as a defense-in-depth measure.
+The proposed mechanism sits beside, rather than replaces, model-extraction defenses. Tram{\`e}r et al.\ \cite{tramer2016} and Orekondy et al.\ \cite{orekondy2019} study extraction attacks; prediction poisoning \cite{orekondy2020} and deceptive perturbations \cite{lee2019} directly perturb outputs or predictions to frustrate stealing; and PRADA detects suspicious query distributions \cite{juuti2019}. Randomized smoothing \cite{cohen2019} and the Gaussian mechanism \cite{dwork2006} are methodological analogies, not model-extraction defenses. Our narrower contribution is a row-wise variance/bias accounting for perturbing internal TSK rule weights during a stated event-window policy. The audit finds limited friction against a weak in-window extractor, not a durable defense, and evaluates query averaging explicitly in Section~\ref{subsec4_4}.
 
 %=====================================================================
 \section{Proposed Methodology}\label{sec3}
 
 \subsection{Preprocessing and Feature Extraction}\label{subsec3_1}
 
-To completely eliminate lookahead bias, all features computed at time $t$ rely strictly on the historical trailing window $[t-N, t-1]$. The historical $\mathrm{VWAP}$ available at time $t$ is computed over $N$ days excluding day $t$:
+To completely eliminate lookahead bias, all features computed at time $t$ rely strictly on the historical trailing window $[t-N, t-1]$. In the canonical three-input baseline used throughout the frozen protocol, $N=20$ trading days for both the VWAP and volume transforms (Tier-2 additionally reports a separate long-horizon column with $N=60$). Define the trailing volume set
+\[
+V_N(t) := \{V_{t-1},V_{t-2},\ldots,V_{t-N}\}.
+\]
+The historical $\mathrm{VWAP}$ available at time $t$ is computed over $N$ days excluding day $t$:
 
 \begin{equation}
     \mathrm{VWAP}_{t-1}(N) = \frac{\sum_{i=1}^{N} P_{t-i} \cdot V_{t-i}}{\sum_{i=1}^{N} V_{t-i}},
@@ -131,7 +131,7 @@ To completely eliminate lookahead bias, all features computed at time $t$ rely s
 \end{equation}
 where $P_{t-i}$ and $V_{t-i}$ denote the closing price and trading volume on day $t-i$. Eq.~\eqref{eq:vwap} represents the volume-weighted average of closing prices over the trailing $N$-day period.
 
-A regularization threshold $\epsilon > 0$ is defined as $\epsilon = 10^{-6} \cdot \mathrm{Mean}(V_N)$. The relative price deviation percentage at time $t$ is:
+A regularization threshold $\epsilon_{\mathrm{reg},t} > 0$ is defined row-wise as $\epsilon_{\mathrm{reg},t} = 10^{-6} \cdot \mathrm{Mean}(V_N(t))$. The relative price deviation percentage at time $t$ is:
 
 \begin{equation}
     Dev_{\mathrm{Price},t} = \left( \frac{P_t - \mathrm{VWAP}_{t-1}(N)}{\mathrm{VWAP}_{t-1}(N)} \right) \times 100\%.
@@ -141,24 +141,24 @@ A regularization threshold $\epsilon > 0$ is defined as $\epsilon = 10^{-6} \cdo
 The volume dynamics are captured via a logarithmic relative transformation:
 
 \begin{equation}
-    Dev_{\mathrm{Volume},t} = \ln \left( \frac{V_t + \epsilon}{\mathrm{Median}(V_N) + \epsilon} \right),
+    Dev_{\mathrm{Volume},t} = \ln \left( \frac{V_t + \epsilon_{\mathrm{reg},t}}{\mathrm{Median}(V_N(t)) + \epsilon_{\mathrm{reg},t}} \right),
     \label{eq:devvol}
 \end{equation}
-where $\mathrm{Median}(V_N)$ is the rolling median volume over the trailing window $[t-N, t-1]$.
+where $\mathrm{Median}(V_N(t))$ is the rolling median volume over the trailing window $[t-N, t-1]$.
 
 To capture directional pressure without Level-1 feeds, we use a \emph{close-location value} (CLV) statistic:
 
 \begin{equation}
-    \mathrm{CLV}_t = \frac{2 P_t - H_t - L_t}{H_t - L_t + \epsilon}, \quad \mathrm{CLV}_t \in [-1, 1],
+    \mathrm{CLV}_t = \frac{2 P_t - H_t - L_t}{H_t - L_t + \epsilon_{\mathrm{reg}}}, \quad \mathrm{CLV}_t \in [-1, 1],
     \label{eq:clv}
 \end{equation}
-where $H_t$, $L_t$, and $P_t$ are the daily high, low, and close. $\mathrm{CLV}_t$ measures where the close sits inside the daily range; positive values indicate upward pressure, negative values downward. No Level-1 order-flow feed exists for these KASE names, so a direct CLV-versus-true-OFI correlation is infeasible. As an internal-consistency audit instead (\texttt{experiments/ofi\_proxy\_audit.py}, $5{,}993$ asset-days 2022--2025), the CLV proxy has a next-day signed-return Rank IC of $-0.111$ (negative at this horizon, so it carries no standalone next-day sign information), while the two independent daily directional readings coincide: CLV-versus-tick-rule Spearman $\rho = 0.499$ with $69.9\%$ sign agreement. The proxy is therefore reported as directionally coherent but unvalidated against true order flow, and the portfolio results never rely on its next-day sign.
+where $H_t$, $L_t$, and $P_t$ are the daily high, low, and close, and $\epsilon_{\mathrm{reg}}=10^{-6}$ is a numerical denominator guard for zero-range bars. $\mathrm{CLV}_t$ measures where the close sits inside the daily range; positive values indicate upward pressure, negative values downward. No Level-1 order-flow feed exists for these KASE names, so a direct CLV-versus-true-OFI correlation is infeasible. As an internal-consistency audit instead (\texttt{experiments/ofi\_proxy\_audit.py}, $5{,}993$ asset-days 2022--2025), the CLV proxy has a next-day signed-return Rank IC of $-0.111$ (negative at this horizon, so it carries no standalone next-day sign information), while the two independent daily directional readings coincide: CLV-versus-tick-rule Spearman $\rho = 0.499$ with $69.9\%$ sign agreement. The proxy is therefore reported as directionally coherent but unvalidated against true order flow, and the portfolio results never rely on its next-day sign.
 
-The system supports three modes via \texttt{of\_mode}:
+The system selects the directional input via \texttt{clv\_mode}:
 \begin{itemize}
-    \item \textbf{CLV} (\texttt{of\_mode='clv'}): Eq.~\eqref{eq:clv} using daily price bounds.
-    \item \textbf{Tick rule} (\texttt{of\_mode='tick'}): $\mathrm{sgn}(P_t - P_{t-1})$ when daily bounds are unreliable.
-    \item \textbf{Hybrid} (\texttt{of\_mode='hybrid'}): CLV if $\{H_t, L_t\}$ exist and $H_t > L_t$, otherwise tick rule fallback.
+    \item \textbf{CLV} (\texttt{clv\_mode='clv'}): Eq.~\eqref{eq:clv} using daily price bounds.
+    \item \textbf{Tick rule} (\texttt{clv\_mode='tick'}): $\mathrm{sgn}(P_t - P_{t-1})$ when daily bounds are unreliable.
+    \item \textbf{Hybrid} (\texttt{clv\_mode='hybrid'}): CLV if $\{H_t, L_t\}$ exist and $H_t > L_t$, otherwise tick rule fallback.
 \end{itemize}
 
 \subsubsection{Tier-2 Feature Enrichment}\label{subsubsec3_1_2}
@@ -174,7 +174,20 @@ so that every Tier-2 column at time $t$ is a function only of bars in $[t-60,\, 
 
 The engine maps the market vector $\mathbf{x}_t = [Dev_{\mathrm{Price},t}, Dev_{\mathrm{Volume},t}, \mathrm{CLV}_t]^T \in \mathbb{R}^3$ to a scalar equity attractiveness score $Y_{\mathrm{attr},t} \in [0, 100]$.
 
-Let $K$ denote the number of fuzzy rules derived via subtractive clustering. We set the subtractive-clustering influence radius to $0.5$ (min-max normalized inputs) and fix $K=5$ after a sensitivity scan; this value is re-evaluated at each monthly re-calibration. Rule $k$ ($k = 1,\dots,K$) is formulated as:
+Let $K$ denote the number of fuzzy rules derived via subtractive clustering. The
+primary specification is frozen before observing 2025 at $K=3$, influence radius
+$r=0.4$, and ridge penalty $\lambda=100$. The 36-point pre-2025 grid was
+$K\in\{3,5,7\}$, $r\in\{0.3,0.4,0.5,0.6\}$, and
+$\lambda\in\{1,10,100\}$; candidates were fit on the early half of the
+2022--2024 training window and validated on its late half, selecting maximum
+validation Rank IC subject to empirical $C\leq100$. This internal split is
+chronological and strictly pre-2025, but it does not purge the final 30
+trading days of the fit half or impose an embargo before validation; the
+selected hyperparameters can therefore be optimistically affected by
+overlapping forward labels. Inputs are kept on the
+canonical raw scale (the optional min--max transform is not used). The frozen
+choice has 21 free consequent/width parameters; $K=3$ is the rule count and is
+unrelated to the separate top-three portfolio size. Rule $k$ ($k = 1,\dots,K$) is formulated as:
 
 \begin{equation}
     \begin{split}
@@ -215,17 +228,24 @@ The output is bounded to $[0,100]$ by projection:
     \label{eq:clipping}
 \end{equation}
 
+On the frozen validation panel, the unclamped empirical envelope
+$C=\max_{t,k}|y_{k,t}-Y_{\mathrm{raw},t}|$ for the selected trial is $59.01$
+points; the reported score still applies the final
+$[0,100]$ projection. The masking experiments below use the separately labelled
+deployed model and its own envelope, rather than silently transferring this
+number.
+
 \subsubsection{ANFIS Hybrid Training Protocol}\label{subsubsec3_3_1}
 
-The available daily bar history covers 5 January 2022 to 31 December 2025 ($6{,}140$ bars in total: $983$--$984$ for KCEL, KEGC, KZAP, KZTK and KZTO, $756$ for KMGZ which lists from 9 December 2022, and $467$ for AIRA from 12 February 2024). All experiments reported in Section~\ref{sec4} use the full 2022--2024 calendar window as a single pooled training panel ($4{,}278$ asset-days over $718$ trading days, the window start trimmed to 2022-02-07 by the feature warm-up) and evaluate strictly out-of-sample on the complete 2025 calendar year ($1{,}722$ asset-days over $246$ trading days per equity); monthly re-calibration within 2025 is not exercised. The code path is identical to the canonical protocol of Section~3.3.1.
+The available daily bar history covers 5 January 2022 to 31 December 2025 ($6{,}140$ bars in total: $983$--$984$ for KCEL, KEGC, KZAP, KZTK and KZTO, $756$ for KMGZ which lists from 9 December 2022, and $467$ for AIRA from 12 February 2024). The primary experiment uses the 2022--2024 calendar window as a pooled training panel ($4{,}278$ asset-days over $718$ trading days), removes the final 30 trading days whose forward labels cross the 2025 boundary ($4{,}061$ rows remain), and evaluates strictly out-of-sample on 2025. The deployed $K=5,r=0.5,\lambda=10$ model is retained only as a labelled sensitivity in masking analyses; no recalibration is performed during 2025.
 
 The forward 30-day risk-adjusted return is defined as:
 
 \begin{equation}
-    R_{30,t} = \frac{P_{t+30} + \sum d_{\mathrm{hist}} - P_t}{P_t} - r^{(30)}_{f,t},
+    R_{30,t} = \frac{P_{t+30} + \sum d_{t,t+30} - P_t}{P_t} - r^{(30)}_{f,t},
     \label{eq:fwd_return}
 \end{equation}
-where $\sum d_{\mathrm{hist}}$ denotes dividends paid over $(t, t+30]$ and $r^{(30)}_{f,t}$ is the cumulative 30-day rate implied by compounding daily TONIA repo yields.
+where $\sum d_{t,t+30}$ denotes dividends paid over $(t, t+30]$ and $r^{(30)}_{f,t}$ is the cumulative 30-day rate implied by compounding daily TONIA repo yields. The supplied dividends file is loaded point-in-time: cancelled declarations are excluded and paid dividends are added to $R_{30}$, so the reported label is dividend-adjusted rather than price-only. The KZTK 2025-05-25 field is a Sunday record date and is not treated as a verified exchange ex-date.
 
 The Z-score of the forward return over the training window is:
 
@@ -243,12 +263,12 @@ To bound targets smoothly inside $(0,100)$, we apply:
 
 ANFIS uses a two-pass hybrid learning paradigm:
 \begin{enumerate}
-    \item \textbf{Forward pass (consequent parameters):} Consequent parameters $\boldsymbol{\beta}$ (20 parameters across 5 rules) are solved by batch least squares over $\mathbf{A}\boldsymbol{\beta} = \mathbf{Y}_{\mathrm{target}}$, where row $t$ of $\mathbf{A}$ contains $\bar{w}_{k,t} \cdot [1, \mathbf{x}_t^T]$:
+    \item \textbf{Forward pass (consequent parameters):} Consequent parameters $\boldsymbol{\beta}$ (12 parameters across 3 rules) are solved by ridge regression over $\mathbf{A}\boldsymbol{\beta} = \mathbf{Y}_{\mathrm{target}}$, where row $t$ of $\mathbf{A}$ contains $\bar{w}_{k,t} \cdot [1, \mathbf{x}_t^T]$:
     \begin{equation}
-        \boldsymbol{\beta}^* = (\mathbf{A}^T \mathbf{A})^{-1} \mathbf{A}^T \mathbf{Y}_{\mathrm{target}}.
+        \boldsymbol{\beta}^* = (\mathbf{A}^T \mathbf{A}+\lambda I)^{-1} \mathbf{A}^T \mathbf{Y}_{\mathrm{target}},\quad \lambda=100.
         \label{eq:ls}
     \end{equation}
-    \item \textbf{Backward pass (antecedent parameters):} Antecedent centers $c_{i,k}$ (15 parameters) are initialized and fixed by subtractive clustering, while antecedent Gaussian widths $\sigma_{i,k}$ (15 free trainable parameters) are updated by gradient descent on the squared-error objective
+    \item \textbf{Backward pass (antecedent parameters):} Antecedent centers $c_{i,k}$ (9 parameters) are initialized and fixed by subtractive clustering, while antecedent Gaussian widths $\sigma_{i,k}$ (9 free trainable parameters) are updated by gradient descent on the squared-error objective
     \begin{equation}
         E = \frac{1}{2}\sum_{t} \left( Y_{\mathrm{raw},t} - Y_{\mathrm{target},t} \right)^2,
         \label{eq:train_error}
@@ -256,7 +276,7 @@ ANFIS uses a two-pass hybrid learning paradigm:
     with learning rate $\eta = 10^{-3}$ for 200 epochs.
 \end{enumerate}
 
-\subsection{Anti-Frontrunning Stochastic Masking Mechanism}\label{subsec3_4}
+\subsection{Pre-AGM Rule-Weight Masking Mechanism}\label{subsec3_4}
 
 Within the window $t \in [t_{\mathrm{AGM}} - M_{\mathrm{Pre}}, t_{\mathrm{AGM}} - 1]$ ($M_{\mathrm{Pre}} = 45$), we inject a constrained perturbation into firing strengths:
 
@@ -264,7 +284,7 @@ Within the window $t \in [t_{\mathrm{AGM}} - M_{\mathrm{Pre}}, t_{\mathrm{AGM}} 
     w_{k,t}^{\text{masked}} = w_{k,t} \cdot (1 + \xi_{k,t}),
     \label{eq:masked_weight}
 \end{equation}
-where $\xi_{k,t}$ is sampled from a zero-mean Gaussian $\mathcal{N}\!\left(0, (\alpha/2)^2\right)$ truncated to $[-\alpha, +\alpha]$ with noise scale $\alpha = 0.05$.
+where $\xi_{k,t}$ is sampled from a zero-mean Gaussian $\mathcal{N}\!\left(0, (\alpha/2)^2\right)$ truncated to $[-\alpha, +\alpha]$ with noise scale $\alpha = 0.05$. The truncation sits at exactly $\pm 2$ standard deviations for every $\alpha$, so the \emph{realised} variance of the draw is $\sigma_\xi^2 = \kappa_{\mathrm{trunc}}\,(\alpha/2)^2$ with retained-variance factor $\kappa_{\mathrm{trunc}} = 1 - 2a\phi(a)/(2\Phi(a)-1)\big|_{a=2} = 0.7738$; every variance statement below uses this realised variance, and the adaptive inversion of Section~\ref{subsubsec3_4_2} is calibrated to it (an uncalibrated inversion understates the noise SD by $\sqrt{\kappa_{\mathrm{trunc}}} = 0.88$, the shortfall measured in \texttt{experiments/truncation\_correction.py}).
 
 The resulting masked crisp output before clipping is given by:
 
@@ -273,50 +293,88 @@ The resulting masked crisp output before clipping is given by:
     \label{eq:defuzz_masked}
 \end{equation}
 
-\begin{proposition}\label{prop:bias}
-Assume $\{\xi_{k,t}\}_{k=1}^K$ are independent, mean-zero, with variance $\sigma_\xi^2$, and $|y_{k,t} - Y_{\mathrm{raw},t}| \le C$. Then the masking introduces a bias in the expected output of order $\mathcal{O}(\sigma_\xi^2)$:
-\[
-    \left| \mathbb{E}\bigl[Y_{\mathrm{raw},t}^{\text{masked}}\bigr] - Y_{\mathrm{raw},t} \right| \le C \sigma_\xi^2.
-\]
+\begin{proposition}[Bias expansion with remainder]\label{prop:bias}
+Assume $\{\xi_{k,t}\}_{k=1}^K$ are independent, mean-zero, with realised variance $\sigma_\xi^2 = \kappa_{\mathrm{trunc}}\,(\alpha/2)^2$ and support $[-\alpha, \alpha]$ with $\alpha < 1$ (so the masked denominator is bounded away from zero), and $|y_{k,t} - Y_{\mathrm{raw},t}| \le C$. Then the masking bias admits the second-order expansion
+\begin{equation}
+    \mathbb{E}\bigl[Y_{\mathrm{raw},t}^{\text{masked}}\bigr] = Y_{\mathrm{raw},t} - \sigma_\xi^2 \sum_{k=1}^{K} \bar{w}_{k,t}^2 \left( y_{k,t} - Y_{\mathrm{raw},t} \right) + R_t,
+    \label{eq:bias_expansion}
+\end{equation}
+with remainder bounded by $|R_t| \le C\,\alpha^3/(1-\alpha)$.
+\end{proposition}
+
+\begin{proof}
+Write $u_t = \sum_k \bar{w}_{k,t}\xi_{k,t}$ and $D_t = \sum_k \bar{w}_{k,t}\xi_{k,t}(y_{k,t} - Y_{\mathrm{raw},t})$. Dividing numerator and denominator of Eq.~\eqref{eq:defuzz_masked} by $\sum_k w_{k,t}$ gives the exact identity $Y^{\text{masked}}_{\mathrm{raw},t} - Y_{\mathrm{raw},t} = D_t/(1 + u_t)$. Expanding $1/(1+u_t) = 1 - u_t + u_t^2/(1+u_t)$ and taking expectations: $\mathbb{E}[D_t] = 0$ by independence and zero mean; $\mathbb{E}[D_t u_t] = \sigma_\xi^2 \sum_k \bar{w}_{k,t}^2 (y_{k,t} - Y_{\mathrm{raw},t})$; and $|R_t| = \bigl|\mathbb{E}\bigl[D_t u_t^2/(1+u_t)\bigr]\bigr| \le C\,\alpha^3/(1-\alpha)$, using $|D_t| \le C\alpha$, $|u_t| \le \alpha$. At the deployed fixed scale ($\alpha = 0.05$) the remainder bound is $0.013$ score points against a second-order term bounded by $\kappa_{\mathrm{trunc}} C (\alpha/2)^2 = 0.048$, and the realised bias ($0.006$ points, mean absolute over rows and $400$ masks) is below Monte-Carlo resolution (SE $0.007$). At the adaptive scales of Section~\ref{subsubsec3_4_2} ($\alpha_t$ up to $1.0$) the analytic remainder bound is vacuous, so the expansion is checked empirically rather than guaranteed: Monte-Carlo over $400$ masks on the Pre-AGM panel gives empirical/predicted bias ratios $0.77$, $0.89$, $1.16$ at $\alpha = 0.3$, $0.6$, $1.0$, with worst-case residual $1.09$ points at $\alpha = 1.0$. These ratios are descriptive observations without Monte-Carlo standard errors and do not establish monotone accuracy at the cap (\texttt{experiments/truncation\_correction.py}).
+\end{proof}
+
+\begin{proposition}[Masking variance identity]\label{thm:masking}
+Under the assumptions of Proposition~\ref{prop:bias}, define the normalised firing weights $\bar{w}_{k,t} = w_{k,t}/\sum_j w_{j,t}$, the effective number of active rules $K_{\mathrm{eff},t} = 1/\sum_k \bar{w}_{k,t}^2$ (inverse Herfindahl), and the weighted consequent dispersion $V_t = \sum_k \bar{w}_{k,t}(y_{k,t} - Y_{\mathrm{raw},t})^2$. Then the masked-output variance satisfies, to second order in $\sigma_\xi$ (the delta-method expansion of the ratio in Eq.~\eqref{eq:defuzz_masked}; odd moments vanish by the symmetry of the truncated draw):
+\begin{equation}
+    \mathrm{Var}\bigl[Y_{\mathrm{raw},t}^{\text{masked}}\bigr] = \sigma_\xi^2 \underbrace{\sum_{k=1}^{K} \bar{w}_{k,t}^2 \bigl(y_{k,t} - Y_{\mathrm{raw},t}\bigr)^2}_{S_t} + O(\sigma_\xi^4).
+    \label{eq:masking_variance}
+\end{equation}
+The injected variance is governed by the dispersion scale $S_t$ itself. Two structural corollaries follow. First, writing the masking amplification factor $\Lambda_t = \sum_k \bar{w}_{k,t}^2 (y_{k,t} - Y_{\mathrm{raw},t})^2 / V_t$, so that $\mathrm{Var}[Y^{\text{masked}}_t] = \sigma_\xi^2 \Lambda_t V_t$: for uniform weights ($\bar{w}_k = 1/K$) $\Lambda_t = 1/K$, while in the limit of a single dominant rule ($\bar{w}_1 \to 1$) $\Lambda_t \to 0$ and masking vanishes --- at most one rule's deviation survives renormalisation, multiplied by the vanishing weight of every other rule. Second, since $\sum_k \bar{w}_{k,t}^2 = 1/K_{\mathrm{eff},t}$ exactly,
+\begin{equation}
+    \mathrm{Var}\bigl[Y_{\mathrm{raw},t}^{\text{masked}}\bigr] \le \sigma_\xi^2 \cdot \max_k \bigl(y_{k,t} - Y_{\mathrm{raw},t}\bigr)^2 \cdot \frac{1}{K_{\mathrm{eff},t}},
+    \label{eq:masking_bound}
+\end{equation}
+which is an \emph{upper} bound only, and must be read as such: a small $K_{\mathrm{eff},t}$ caps how much variance the mask \emph{can} inject but does not by itself make that variance small --- a low-weight rule with a large consequent deviation (up to $C$) can still dominate $S_t$ --- so efficacy at any given row is governed by the realised dispersion $S_t$ (together with the noise scale $\sigma_\xi^2$), not by $K_{\mathrm{eff},t}$ alone.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
-Second-order Taylor expansion around $\xi_{k,t}=0$ yields:
-\begin{equation}
-    \mathbb{E}\bigl[Y_{\mathrm{raw},t}^{\text{masked}}\bigr] \approx Y_{\mathrm{raw},t} - \sigma_\xi^2 \sum_{k=1}^{K} \bar{w}_{k,t}^2 \left( y_{k,t} - Y_{\mathrm{raw},t} \right).
-    \label{eq:bias_expansion}
-\end{equation}
-With $C = 100$ and $\alpha = 0.05$, the worst-case bias is $\le 100 \cdot (0.025)^2 = 0.0625$, negligible on a $[0,100]$ scale.
+Write $w_k^{\text{masked}} = w_k(1+\xi_k)$ and expand $Y^{\text{masked}} = \sum_k w_k(1+\xi_k)y_k / \sum_j w_j(1+\xi_j)$ to first order in $\xi$: the denominator contributes $-\sum_j \bar{w}_j \xi_j \cdot Y_{\mathrm{raw}}$, giving $Y^{\text{masked}}_t - Y_{\mathrm{raw},t} \approx \sum_k \bar{w}_{k,t}\xi_{k,t}(y_{k,t} - Y_{\mathrm{raw},t})$. Independence of the $\xi_{k,t}$ yields Eq.~\eqref{eq:masking_variance} directly. For the regimes: at uniform weights $\bar{w}_k^2 = 1/K^2$ factors out and the sum is $V_t/K$; at concentration $\bar{w}_1 \to 1$ every term carries a factor $\bar{w}_k^2 (y_k - Y_{\mathrm{raw}})^2$ in which either $\bar{w}_k \to 0$ ($k > 1$) or $(y_1 - Y_{\mathrm{raw}}) \to 0$ ($k = 1$), so the sum vanishes. The bound follows from factoring $\max_k (y_k - Y_{\mathrm{raw}})^2$ out of the sum and recognising the remainder as $1/K_{\mathrm{eff},t}$ exactly --- a one-directional cap, not an equivalence. On the paper's Pre-AGM panel the truncation-calibrated first-order prediction matches Monte-Carlo masked-output variance with cross-row correlation $0.999$ and median empirical/predicted ratio $0.99$--$1.01$ for $\alpha \le 0.2$ ($1.25$ at $\alpha = 1.0$, the second-order correction; without the $\kappa$ calibration the ratio is $0.77$); \texttt{experiments/adaptive\_masking.py} and \texttt{experiments/truncation\_correction.py}.
 \end{proof}
 
+\subsubsection{Dispersion-Adaptive Masking}\label{subsubsec3_4_2}
+Proposition~\ref{thm:masking} is constructive: because the first-order variance is known in closed form, the noise scale can be inverted per observation so the masked output carries a target variance $\epsilon_{\mathrm{target}}^2$ wherever the non-negativity cap below does not bind --- with the truncation factor $\kappa_{\mathrm{trunc}}$ of Eq.~\eqref{eq:masked_weight} restored, since inverting the uncalibrated identity would undershoot the target by $\sqrt{\kappa_{\mathrm{trunc}}}$:
+\begin{equation}
+    \alpha_t = \min\!\left(\alpha_{\max},\, \frac{2\epsilon_{\mathrm{target}}}{\sqrt{\kappa_{\mathrm{trunc}}\,S_t}}\right), \quad S_t = \sum_{k=1}^{K} \bar{w}_{k,t}^2 \bigl(y_{k,t} - Y_{\mathrm{raw},t}\bigr)^2.
+    \label{eq:adaptive_alpha}
+\end{equation}
+Calibration is not cosmetic: the uncalibrated inversion $2\epsilon_{\mathrm{target}}/\sqrt{S_t}$ realises only $\sqrt{\kappa_{\mathrm{trunc}}}\,\epsilon_{\mathrm{target}} \approx 0.88\epsilon_{\mathrm{target}}$ even on uncapped rows ($1.76$ against the $2.0$ target on the Pre-AGM panel), whereas Eq.~\eqref{eq:adaptive_alpha} realises $1.04\,\epsilon_{\mathrm{target}}$ there --- the residual $+4\%$ is the second-order variance correction measured in Proposition~\ref{prop:bias}'s Monte-Carlo check ($1.065$ empirical/predicted at $\alpha = 0.6$). Where the cap $\alpha_{\max}$ binds, the target noise is not reached; the binding rate is reported alongside the result. Because $\alpha_t$ grows as $S_t$ shrinks, the cap binds on the rows with the \emph{smallest} consequent dispersion --- where even $\alpha_{\max}$ cannot lift the noise to $\epsilon_{\mathrm{target}}$ --- not on the noisiest rows. Equation~\eqref{eq:adaptive_alpha} is guarded against the degenerate case: when $S_t$ is numerically zero ($S_t \le 10^{-8}$) --- i.e., all rules agree on the consequent, $y_{k,t} = Y_{\mathrm{raw},t}$ --- the score is invariant to rule-weight masking and $\alpha_t$ is set to zero rather than dividing by zero. The cap is defined as the largest noise scale preserving non-negative masked weights,
+\begin{equation}
+    \alpha_{\max} = \max\bigl\{\alpha \ge 0 : w_{k,t}(1+\xi) \ge 0 \ \ \forall k,\ \forall |\xi| \le \alpha\bigr\} = 1.0,
+    \label{eq:alpha_max}
+\end{equation}
+since $w_{k,t}^{\text{masked}} = w_{k,t}(1 + \xi_{k,t})$ with $|\xi_{k,t}| \le \alpha_t$: any $\alpha_t > 1$ would permit sign-reversing weights and break the convexity of the defuzzification sum. Relaxing this constraint would require a defuzzification scheme tolerating signed weights (Section~\ref{sec6}). Bias control is preserved: Proposition~\ref{prop:bias} applies row-wise with the realised variance $\sigma_{\xi,t}^2 = \kappa_{\mathrm{trunc}}\,(\alpha_t/2)^2$, so the adaptive scheme trades a larger (but still bounded and reported) bias for a calibrated noise target --- the bias--efficacy frontier the fixed scheme cannot reach. The implementation is \texttt{src/masking.py:adaptive\_masked\_firing\_scores}.
+
 \begin{remark}[Threat-model scope]\label{rem:threat_model}
-Proposition~\ref{prop:bias} bounds only the bias of the masked output. It does not establish query-averaging robustness: an adversary who can query the model $Q$ times for the same input vector $\mathbf{x}_t$ and average the responses observes an effective noise standard deviation of $\sigma_\xi / \sqrt{Q}$. At the deployed $\alpha = 0.05$ ($\sigma_\xi = 0.025$, $C = 100$) a single query leaves up to $2.5$ score points of noise, $25$ averaged queries bring the error below $0.5$ points, and $625$ queries below $0.1$ points (\texttt{src/masking.py:unlimited\_query\_bound}). The masking is therefore \emph{obfuscation with a quantified query budget}, not security against an unlimited-query adversary, and production use requires pairing it with rate-limiting, query authentication, and randomized execution schedules (Section~\ref{subsec5_2}).
+Proposition~\ref{prop:bias} bounds only the bias of the masked output. It does not establish query-averaging robustness: an adversary who can query the model $Q$ times for the same input vector $\mathbf{x}_t$ and average the responses observes an effective noise standard deviation of $\sigma_\xi / \sqrt{Q}$. At the deployed $\alpha = 0.05$ (realised $\sigma_\xi = \sqrt{\kappa_{\mathrm{trunc}}} \cdot 0.025 = 0.022$, $C = 100$) a single query leaves up to $2.2$ score points of noise, about $20$ averaged queries bring the error below $0.5$ points, and about $480$ queries below $0.1$ points.\footnote{The query-budget arithmetic is implemented in \texttt{src/masking.py} (\texttt{unlimited\_query\_bound}).} The masking is therefore \emph{obfuscation with a quantified query budget}, not security against an unlimited-query adversary --- consistent with the model-extraction literature, where repeated API queries (including averaging over noisy outputs) recover target models with high fidelity \cite{tramer2016} --- and production use requires pairing it with rate-limiting, query authentication, and randomized execution schedules (Section~\ref{subsec5_2}).
 \end{remark}
 
 \begin{algorithm}[htbp]
-\caption{TSK inference with range-imbalance mode and Pre-AGM masking}\label{alg:tsk_eval}
+\caption{TSK inference with CLV directional mode and dispersion-adaptive Pre-AGM masking}\label{alg:tsk_eval}
 \begin{algorithmic}[1]
-\Require Bar row $\{P_t,H_t,L_t,V_t\}$, mode \texttt{of\_mode}, parameters $\{c_{i,k},\sigma_{i,k},\boldsymbol{\beta}_k\}_{k=1}^K$, indicator $I_{\mathrm{PreAGM}} \in \{0,1\}$, noise limit $\alpha = 0.05$.
+\Require Bar row $\{P_t,H_t,L_t,V_t\}$, mode \texttt{clv\_mode}, parameters $\{c_{i,k},\sigma_{i,k},\boldsymbol{\beta}_k\}_{k=1}^K$, indicator $I_{\mathrm{PreAGM}} \in \{0,1\}$, masking scheme $\texttt{scheme} \in \{\texttt{adaptive},\texttt{fixed}\}$, target noise $\epsilon_{\mathrm{target}} = 2.0$, cap $\alpha_{\max} = 1.0$, fixed-scale rate $\alpha = 0.05$, truncation factor $\kappa_{\mathrm{trunc}} = 0.7738$.
 \Ensure Score $Y_{\mathrm{attr},t} \in [0,100]$.
 \State Compute $Dev_{\mathrm{Price},t}$ and $Dev_{\mathrm{Volume},t}$ via Eq.~\eqref{eq:devprice}--\eqref{eq:devvol}.
-\If{\texttt{of\_mode='clv'} \textbf{or} (\texttt{of\_mode='hybrid'} \textbf{and} $H_t, L_t$ exist \textbf{and} $H_t > L_t$)}
-    \State $p_t \leftarrow \dfrac{2 P_t - H_t - L_t}{H_t - L_t + \epsilon}$
-\ElsIf{\texttt{of\_mode='tick'}}
-    \State $p_t \leftarrow \mathrm{sgn}(P_t - P_{t-1})$
-\Else \Comment{Hybrid fallback for missing or corrupted daily bounds}
+\If{\texttt{clv\_mode='clv'} \textbf{or} (\texttt{clv\_mode='hybrid'} \textbf{and} $H_t, L_t$ exist \textbf{and} $H_t > L_t$)}
+    \State $p_t \leftarrow \dfrac{2 P_t - H_t - L_t}{H_t - L_t + \epsilon_{\mathrm{reg}}}$
+\Else \Comment{Tick rule, also the hybrid fallback when bounds are missing}
     \State $p_t \leftarrow \mathrm{sgn}(P_t - P_{t-1})$
 \EndIf
 \State $\mathbf{x}_t \leftarrow [Dev_{\mathrm{Price},t}, Dev_{\mathrm{Volume},t}, p_t]^T$.
 \For{$k = 1$ \textbf{to} $K$}
     \State Compute $\mu_{i,k}(x_{i,t})$ via Eq.~\eqref{eq:gauss_mf}
     \State $w_{k,t} \leftarrow \prod_{i=1}^{3} \mu_{i,k}(x_{i,t})$
-    \If{$I_{\mathrm{PreAGM}} = 1$}
-        \State Sample $\xi_{k,t} \sim \mathcal{N}\left(0, (\alpha/2)^2\right)$
-        \Statex \hspace{\algorithmicindent}\hspace{\algorithmicindent}\hspace{\algorithmicindent} truncated to $[-\alpha, +\alpha]$
-        \State $w_{k,t} \leftarrow w_{k,t} (1 + \xi_{k,t})$
-    \EndIf
     \State $y_{k,t} \leftarrow \beta_{0,k} + \sum_{i=1}^3 \beta_{i,k} x_{i,t}$
 \EndFor
+\State $Y_{\mathrm{raw},t} \leftarrow \sum_k \bar{w}_{k,t} y_{k,t}$ with $\bar{w}_{k,t} = w_{k,t}/\sum_j w_{j,t}$
+\If{$I_{\mathrm{PreAGM}} = 1$}
+    \If{\texttt{scheme} = \texttt{adaptive}}
+        \State $S_t \leftarrow \sum_k \bar{w}_{k,t}^2 (y_{k,t} - Y_{\mathrm{raw},t})^2$ \Comment{Proposition~\ref{thm:masking}}
+        \If{$S_t \le 10^{-8}$} \Comment{all rules agree; score invariant}
+            \State $\alpha_t \leftarrow 0$
+        \Else
+            \State $\alpha_t \leftarrow \min(\alpha_{\max},\, 2\epsilon_{\mathrm{target}}/\sqrt{\kappa_{\mathrm{trunc}} S_t})$ \Comment{Eq.~\eqref{eq:adaptive_alpha}}
+        \EndIf
+    \Else \Comment{fixed-scale fallback}
+        \State $\alpha_t \leftarrow 0.05$
+    \EndIf
+    \For{$k = 1$ \textbf{to} $K$}
+        \State Sample $\xi_{k,t} \sim \mathcal{N}\left(0, (\alpha_t/2)^2\right)$ truncated to $[-\alpha_t, +\alpha_t]$
+        \State $w_{k,t} \leftarrow w_{k,t} (1 + \xi_{k,t})$
+    \EndFor
+\EndIf
 \State $S_w \leftarrow \sum_{k=1}^{K} w_{k,t}$
 \If{$S_w < 10^{-8}$}
     \State \Return $50.0$
@@ -337,7 +395,7 @@ We integrate three data streams from the Kazakhstan Stock Exchange (KASE) and th
     \item \textbf{Corporate disclosures:} Audited EBITDA, net debt, and free cash flow to equity (FCFE) in mln KZT, supplied per reporting year and per reporting period (quarterly and half-year legs, plus annual \mbox{``for the year''} totals where published).
 \end{enumerate}
 
-The model is trained on 2022-01-01 to 2024-12-31 ($4{,}278$ pooled asset-days over $718$ trading days --- $718$ each for KCEL and KEGC, $717$ for KZAP, KZTK and KZTO, $490$ for KMGZ and $201$ for AIRA, whose histories begin later --- the window start being trimmed to 2022-02-07 by the feature warm-up) and evaluated strictly out-of-sample on the complete 2025 calendar year ($1{,}722$ asset-days over $246$ trading days per equity), of which $1{,}512$ carry an observable 30-day forward return ($216$ per equity; the final month of 2025 lacks a forward label). Model output maps to corporate Payout Ratio $PR_t \in [0\%, 100\%]$ via
+The model is trained on 2022-01-01 to 2024-12-31 ($4{,}278$ pooled asset-days over $718$ trading days --- $718$ each for KCEL and KEGC, $717$ for KZAP, KZTK and KZTO, $490$ for KMGZ and $201$ for AIRA, whose histories begin later --- the window start being trimmed to 2022-02-07 by the feature warm-up) and evaluated strictly out-of-sample on the complete 2025 calendar year ($1{,}722$ asset-days over $246$ trading days per equity), of which $1{,}512$ carry an observable 30-day forward return ($216$ per equity; the final month of 2025 lacks a forward label). The payout mapping is retained as an exploratory, unpurged application of the deployed $K=5$, $r=0.5$, $\lambda=10$ score, not the frozen $K=3$ primary model, and is not evidence of predictive or decision-alignment skill. Model output maps to corporate Payout Ratio $PR_t \in [0\%, 100\%]$ via
 
 \begin{equation}
     PR_{\mathrm{target},t} = \psi(Y_{\mathrm{attr},t}) \cdot \Phi\!\left(\frac{\mathrm{Net\ Debt}}{\mathrm{EBITDA}}, \mathrm{FCFE}\right),
@@ -348,38 +406,37 @@ where $\psi(Y) = \max\bigl(0, \min(1, Y/100)\bigr)$ and the leverage/FCFE penalt
 \begin{equation}
     \Phi(L, F) =
     \begin{cases}
-        \dfrac{1}{1 + \exp\!\bigl(\kappa (L - \tau)\bigr)}, & F > 0, \\[6pt]
+        \dfrac{1}{1 + \exp\!\bigl(\kappa_{\mathrm{lev}} (L - \tau)\bigr)}, & F > 0, \\[6pt]
         0, & F \le 0,
     \end{cases}
     \label{eq:phi}
 \end{equation}
-with leverage penalty intensity $\kappa = 3.0$ and Net Debt/EBITDA threshold $\tau = 1.0$.
+with leverage penalty intensity $\kappa_{\mathrm{lev}} = 3.0$ and Net Debt/EBITDA threshold $\tau = 1.0$. Both are set a priori, not tuned: $\tau = 1.0$ is a conventional investment-grade leverage screen, and $\kappa_{\mathrm{lev}} = 3.0$ makes the penalty decisive ($1/(1+e^{3}) \approx 0.05$ at $L = 2.0$) by construction, so the mapping is deliberately conservative --- it screens out leveraged payers rather than pricing their distress finely. The KEGC and KZTO rows of Table~\ref{tab:h1_validation} show the cost of that conservatism directly.
 
 \subsection{Out-of-Sample Corporate Decision Alignment}\label{subsec4_2}
 
-Table~\ref{tab:h1_validation} presents the model payout recommendations --- computed from the mean out-of-sample attractiveness score and the latest reported FY2025 fundamentals --- versus actual board decisions across the seven panel equities.
-
+Table~\ref{tab:h1_validation} presents a descriptive feasibility screen using the deployed $K=5$, $r=0.5$, $\lambda=10$ score, computed from the mean score through each AGM date and the FY2024 annual fundamentals available at that date, alongside the collected approved board decisions for the seven panel equities. The frozen $K=3$ primary model is not used in this exploratory table. Approved values are percent of profit whereas model targets are percent of FCFE; because the denominators differ, the two columns must not be subtracted or summarized by a mean absolute gap. With pre-AGM scores in $[48.4, 50.1]$ ($\psi \in [0.484, 0.501]$), the score acts as an approximately constant halving and adds no meaningful cross-sectional dispersion to the feasibility screen.
 \begin{table}[htbp]
 \centering
 \small
-\caption{Model payout recommendations vs.\ actual corporate decisions (FY2025 financials; out-of-sample mean scores)}
+\caption{Descriptive payout feasibility screen using the deployed $K=5$, $r=0.5$, $\lambda=10$ score under referee fiscal timing. The frozen $K=3$ primary model is not used. Model targets are percent of FCFE, whereas approved decisions are percent of profit; the columns are therefore not comparable validation outcomes and no gap statistic is reported. The score is averaged over the pre-decision window 2025-01-01..AGM date.}
 \label{tab:h1_validation}
-\begin{tabular}{@{}lccccl@{}}
+\begin{tabular}{@{}lccccc@{}}
 \toprule
-\textbf{Ticker} & \textbf{FCFE (m KZT)} & \textbf{ND/EBITDA} & \textbf{Model target (\% FCFE)} & \textbf{Actual decision} & \textbf{Alignment} \\
+\textbf{Ticker} & \textbf{FCFE (m KZT)} & \textbf{ND/EBITDA} & \textbf{Model target (\% FCFE)} & \textbf{$\Phi$-only (\% FCFE)} & \textbf{Approved (\% profit)} \\
 \midrule
-KMGZ & 383{,}000   & 0.64x              & 36.8\%         & 50.0--60.0\%   & Below range \\
-KZAP & 285{,}000   & 0.22x              & 44.6\%         & 75.0--100.0\%  & Below range \\
-KEGC & 22{,}400    & 1.37x              & 12.1\%         & 65.0--75.0\%   & Below range \\
-KCEL & $-13{,}400$ & 5.43x              & 0.0\%          & 0.0\%          & Full \\
-AIRA & 8{,}200     & 3.19x              & 0.1\%          & 0.0\%          & Full \\
-KZTK & $-18{,}200$ & 0.80x              & 0.0\%          & 0.0\%          & Full \\
-KZTO & $-23{,}100$ & $-1.38$x           & 0.0\%          & 85.0--100.0\%  & Mismatch (neg.\ FCFE) \\
+AIRA & 10{,}400 & 1.19x & 17.6\% & 36.4\% & 75.0\% \\
+KCEL & $-37{,}400$ & 1.41x & 0.0\% & 0.0\% & 0.0\% \\
+KEGC & 42{,}800 & 0.72x & 34.2\% & 69.9\% & 76.0\% \\
+KMGZ & 732{,}000 & 0.58x & 38.8\% & 77.8\% & 27.0\% \\
+KZAP & 437{,}000 & $-0.17$x & 47.3\% & 97.1\% & 75.0\% \\
+KZTK & $-44{,}500$ & 1.10x & 0.0\% & 0.0\% & 100.0\% \\
+KZTO & 27{,}200 & $-0.56$x & 48.9\% & 99.1\% & 80.0\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Only three of the seven names align fully, so the corporate-decision contribution is mixed rather than confirmatory. For the three profitable payers (KMGZ, KZAP, KEGC) the model sits materially \emph{below} the announced payout range, consistent with the leverage penalty $\Phi$ of Eq.~\eqref{eq:phi} under-shooting for leveraged-but-profitable issuers in the high-rate 2025 regime (KEGC at ND/EBITDA $1.37\times$ is penalised hardest). The KZTO row is an outright mismatch: despite negative FCFE the board paid $85$--$100\%$, evidently from prior-year retained earnings or cash balances common for state-owned oil transport. The hard-zero rule ($\Phi = 0$ if FCFE $\le 0$) is therefore too strong as written and should be read as a conservative feasibility screen rather than a prediction of observed board behaviour.
+The table is not a predictive alignment comparison: the FCFE-denominated model outputs and profit-denominated approvals are shown side by side only to document feasibility and denominator coverage. KZTK exposes the mismatch directly: its approved payout is percent of profit while FY2024 FCFE is negative, forcing the FCFE-denominated target to zero. The hard-zero rule ($\Phi = 0$ if FCFE $\le 0$) is a feasibility screen, not a prediction of observed board behaviour.
 
 Figure~\ref{fig:kmgz_series} plots actual out-of-sample daily scores $Y_{\mathrm{attr},t}$ for JSC NC KazMunayGas (KMGZ) loaded directly from the evaluation CSV dataset; the shaded band marks the Pre-AGM masking window, which now falls inside the out-of-sample year.
 
@@ -411,13 +468,13 @@ Figure~\ref{fig:kmgz_series} plots actual out-of-sample daily scores $Y_{\mathrm
     \node at (axis cs: 72.5, 8) [font=\tiny\sffamily, color=orange!90!black, fill=orange!10, inner sep=1.5pt, rounded corners=1pt] {Pre-AGM Masked Window};
 \end{axis}
 \end{tikzpicture}
-\caption{Out-of-sample daily fuzzy scores $Y_{\mathrm{attr},t}$ alongside the scaled 30-day forward target $R_{30,t}^{\mathrm{scaled}}$ for JSC NC KazMunayGas (KMGZ) across the 246 trading days of the 2025 out-of-sample window, plotted directly from the evaluation export (\texttt{kmgz\_2025\_out\_of\_sample.csv}). The shaded band spans the $30$ Pre-AGM trading days 2025-04-01 to 2025-05-15 (days 58--87), during which the stochastic masking of Section~\ref{subsec3_4} is armed.}
+\caption{Out-of-sample daily fuzzy scores $Y_{\mathrm{attr},t}$ alongside the scaled 30-day forward target $R_{30,t}^{\mathrm{scaled}}$ for JSC NC KazMunayGas (KMGZ) across the 246 trading days of the 2025 out-of-sample window, plotted directly from the evaluation export (\texttt{kmgz\_2025\_out\_of\_sample.csv}). The shaded band spans the $30$ Pre-AGM trading days 2025-04-01 to 2025-05-15 (days 58--87), during which the stochastic masking of Section~\ref{subsec3_4} is armed; the $45$-day $M_{\mathrm{Pre}}$ window of Eq.~\eqref{eq:masked_weight} is in calendar days, of which $30$ are trading days. The figure shows KMGZ only; AIRA lists from 2024-02-12 and its panel history is shorter, though it contributes a full 246-day 2025 test leg like the other six names.}
 \label{fig:kmgz_series}
 \end{figure}
 
 \subsection{Comparative Benchmark Analysis and Data-Scarcity Framing}\label{subsec4_3}
 
-Table~\ref{tab:benchmark} compares the proposed TSK framework against an ordinary least squares (OLS) linear baseline on identical features and targets, plus two zero-parameter baselines on identical labels and dates: \emph{carry} (ranks by last month's realised forward return, testing persistence) and \emph{equal} (a constant score with no ranking information). 95\% confidence intervals are calculated using $B = 5{,}000$ moving-block bootstrap replications (30-day blocks) over the 246 out-of-sample days ($\approx 8$ non-overlapping blocks), and the monthly portfolio statistics rest on eleven non-overlapping monthly rebalancing dates. Hyper-parameter documentation: TSK hyper-parameters come from \texttt{experiments/tune\_tsk.py} on a chronological internal split of the training window (maximising validated Rank IC subject to $C \le 100$; the deployed $K=5/r=0.5/\mathrm{ridge}=10$ was retained after the scan winner reversed out-of-sample), OLS is closed-form with no hyper-parameters, and carry/equal have none by construction. All models share identical training/test splits.
+Table~\ref{tab:benchmark} compares the frozen TSK framework against OLS and fixed-seed non-learned benchmarks: trailing five-day momentum, random top-3 selection, and an equal-weight all-seven portfolio. The primary TSK fit is selected by the 36-trial pre-2025 ledger in \texttt{outputs/logs/frozen\_tuning.csv}; labels whose 30-day forward window crosses the 2024--2025 boundary are removed, giving a 30-trading-day test embargo. The fit--validation split used for that ledger is not itself purged or embargoed, so the frozen specification is pre-2025 but the selection step is not fully leakage-free; the 2025 estimates should be read conditionally on that selected specification. The previously deployed $K=5/r=0.5/\mathrm{ridge}=10$ setting is reported only as a test-informed sensitivity. Features use the day-$t$ close and the reported portfolio return is the forward close-to-close return beginning after that observation; no same-close executable fill is assumed.
 
 \begin{table}[htbp]
 \centering
@@ -428,60 +485,73 @@ Table~\ref{tab:benchmark} compares the proposed TSK framework against an ordinar
 \toprule
 \textbf{Model} & \textbf{Total (Free Trainable) Params} & \textbf{RMSE} & \textbf{MAE} & \textbf{Daily Pooled Rank IC} & \textbf{Monthly Rank IC} & \textbf{Net Sharpe (15 bps)} \\
 \midrule
-Proposed TSK (CLV) & 50 (35)        & 12.38          & 8.80           & $-0.024$ [$-0.091, 0.078$] & $0.438 \pm 0.062$ & \textbf{2.58} \\
-OLS                & 4 (4)          & \textbf{12.09} & \textbf{8.66}  & $-0.046$                & --- & 0.84 \\
-Carry (persistence) & 0             & 52.34          & 50.97          & $0.170$                 & $0.246$ & 1.64 \\
-Equal (no-information) & 0          & 11.98          & 8.65           & ---                     & --- & $-2.91$ \\
+Frozen TSK (CLV) & 30 (21)        & 14.09          & 9.94           & $0.052$ [$-0.010, 0.131$] & $0.201 \pm 0.120$ & 0.98 \\
+OLS                & 4 (4)          & \textbf{13.53} & \textbf{9.63}  & $-0.106$                & --- & 0.99 \\
+Momentum (5-day) & 0             & 53.27          & 51.60          & $-0.032$                 & $-0.006$ & 0.67 \\
+Random top-3 (fixed seed) & 0       & 56.23          & 54.60          & $-0.004$                 & $0.062$ & 0.51 \\
+Equal-weight all seven & 0          & \textbf{13.35} & \textbf{9.58}  & ---                 & --- & 0.98 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The carry baseline is informative: last month's winners persisting explains part of 2025 (daily pooled IC $0.170$, monthly cross-sectional IC $0.246$, net Sharpe $1.64$), yet the fuzzy scorer still leads it by nearly a full Sharpe point ($2.58$ vs.\ $1.64$) with far lower target error. The equal-weight (constant-score) baseline attains the lowest target-space error (RMSE $11.98$ vs.\ $12.38$ for TSK), which is expected rather than alarming: the bounded $\tanh$ target of Eq.~\eqref{eq:bounded_target} compresses tails around $50$, so a near-constant predictor is near-optimal in L2 while carrying no ranking information; RMSE is therefore reported for completeness but is not the criterion this framework optimises. The equal baseline confirms the 2025 test year itself was long-friendly: an uninformed constant score earns $-2.91$, so the TSK Sharpe is ranking skill, not market drift.
+The non-learned benchmarks provide a more appropriate comparison than arbitrary constant-score tie-breaking. On the same labels and dates, five-day momentum earns Sharpe $0.67$, a fixed-seed random top-3 earns $0.51$, and equal-weighting all seven names earns $0.98$ at 15 bps. The frozen TSK value ($0.98$) therefore does not demonstrate a long-friendly year or isolate ranking skill; the monthly IC and portfolio result remain descriptive and are subject to the date-clustered uncertainty reported above.
+
+\noindent\textbf{Portfolio construction algorithm.} For completeness, the reported top-3 portfolio is a long-only, equal-weighted portfolio, not a score-weighted portfolio. At the first available trading day of each calendar month, the algorithm filters to names with a non-missing $R_{30,t}$ label, sorts them by the frozen score $Y_{\mathrm{attr},t}$ in descending order, and selects the three highest-ranked names. Exact score ties are resolved deterministically by ascending ticker symbol. Each selected name receives weight $1/3$ and is held for the following 30 trading days represented by $R_{30,t}$; the return therefore starts after the day-$t$ observation and uses the close-to-close interval from $P_t$ to $P_{t+30}$, with dividends and the risk-free adjustment defined in Eq.~\eqref{eq:fwd_return}. The score uses the day-$t$ close, but no same-close executable fill is assumed. The portfolio return for month $m$ is
+\[
+R^{\mathrm{port}}_m = \frac{1}{3}\sum_{i\in\mathcal{P}_m}R_{30,i}.
+\]
+For a cost tier of $c$ basis points per round trip, month-to-month membership turnover is computed from the symmetric difference of consecutive three-name sets:
+\[
+\tau_m = \frac{|\mathcal{P}_m\triangle\mathcal{P}_{m-1}|}{2\cdot 3}.
+\]
+The reported annualised turnover is $12$ times the mean $\tau_m$, and the monthly cost deduction is $(\overline{\tau}\,c/10{,}000)$ before annualising the net monthly Sharpe by $\sqrt{12}$. Thus costs are applied as a proportional turnover haircut; there is no spread, market-impact, leverage, or intramonth execution model. Months with fewer than three labelled names are omitted. The implementation is \texttt{src/backtest.py:top\_n\_portfolio\_returns}.
 
 \subsubsection{Walk-Forward Validation Across Test Years}\label{subsubsec4_3_wf}
 
-Because bars now start in 2022, the canonical protocol admits three chronological strictly-out-of-sample folds (\texttt{experiments/walk\_forward.py}, same ANFIS hyper-parameters per fold): train 2022 $\rightarrow$ test 2023, train 2022--2023 $\rightarrow$ test 2024, and the canonical train 2022--2024 $\rightarrow$ test 2025. Table~\ref{tab:walkforward} reports each fold's monthly cross-sectional Rank IC and 15-bps net Sharpe with Student-$t$ 95\% intervals over the three test years.
+Because bars now start in 2022, the protocol reports three chronological folds (\texttt{experiments/walk\_forward.py}): train 2022 $\rightarrow$ test 2023, train 2022--2023 $\rightarrow$ test 2024, and train 2022--2024 $\rightarrow$ test 2025. Every fold removes a 30-trading-day label-overlap region. All folds use the frozen $K=3,r=0.4,\lambda=100$ specification selected by the 36-trial scan on the full pre-2025 window; consequently, folds 2023 and 2024 are descriptive in-sample-for-selection diagnostics, not independent out-of-sample estimates. The scan itself fits candidates on the first chronological half of 2022--2024 and validates on the second half without an additional fit-to-validation embargo; only the final training-to-2025 boundary receives the 30-day purge.
 
 \begin{table}[htbp]
 \centering
 \small
-\caption{Walk-forward validation: expanding training window, held-out test year. Each fold refits the canonical ANFIS protocol; labels use training-window-only moments.}
+\caption{Walk-forward validation: expanding training window, held-out test year. Each fold uses the frozen $K=3,r=0.4,\lambda=100$ specification and a 30-trading-day label purge. Fold $n_{\mathrm{train}}$ counts pooled asset-days after the feature warm-up.}
 \label{tab:walkforward}
 \begin{tabular}{@{}lcccccc@{}}
 \toprule
 \textbf{Train} & \textbf{Test} & $\boldsymbol{n_{\mathrm{train}}}$ & $\boldsymbol{n_{\mathrm{labelled}}}$ & \textbf{RMSE} & \textbf{Monthly Rank IC} & \textbf{Net Sharpe (15 bps)} \\
 \midrule
-2022 & 2023 & 1{,}112 & 1{,}471 & 9.59 & $0.085 \pm 0.120$ & 0.59 \\
-2022--2023 & 2024 & 2{,}583 & 1{,}695 & 8.14 & $-0.073 \pm 0.110$ & 0.11 \\
-2022--2024 & 2025 & 4{,}278 & 1{,}512 & 12.38 & $0.438 \pm 0.062$ & 2.58 \\
+2022 (purged) & 2023 & 957 & 1{,}471 & 15.79 & $0.204 \pm 0.160$ & 0.72 \\
+2022--2023 (purged) & 2024 & 2{,}397 & 1{,}695 & 9.65 & $0.079 \pm 0.135$ & 0.25 \\
+2022--2024 & 2025 (purged) & 4{,}061 & 1{,}512 & 14.09 & $0.201 \pm 0.120$ & 0.98 \\
 \midrule
-\multicolumn{5}{l}{Mean over test years (Student-$t$ 95\% CI)} & $0.150$ [$-0.501, 0.801$] & $1.09$ [$-2.16, 4.35$] \\
+\multicolumn{5}{l}{Mean over embargoed folds (Student-$t$ 95\% CI)} & $0.161$ [$-0.015, 0.338$] & $0.65$ [$-0.266, 1.569$] \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The honest reading is that there is no statistically identifiable monthly ranking skill across the four-year sample: the primary statistic is the three-fold mean monthly IC of $0.150$ with a $t$-interval of $[-0.501, 0.801]$, and the 2025 fold ($0.438$) is best treated as a single favourable draw reported as supplementary detail rather than the canonical result. The first two test years show no monthly ranking skill ($0.085$ and $-0.073$) and near-zero Sharpe. The mean Sharpe is $1.09$ with $[-2.16, 4.35]$ --- likewise spanning zero, exactly as three annual observations must. The sample now covers four calendar years and $5{,}993$ asset-days (up from one test year), but annual-fold statistics remain the binding constraint: pre-2022 bars and more listed names are the only route to tighter multi-year intervals, and the paper claims no more than this.
+The honest reading is that there is no statistically identifiable monthly ranking skill in the frozen 2025 result: its statistic is $0.201$ with a date-clustered interval of $[-0.013, 0.432]$. The three-fold mean $0.161$ with interval $[-0.015, 0.338]$ and Sharpe mean $0.65$ with interval $[-0.266,1.569]$ are descriptive summaries only, because the same choice was selected using the full pre-2025 window. Independent confirmation requires a prospective fold-specific scan.
 
-\noindent\textbf{Contextualizing Rank IC Magnitude and Overlap Mechanics:} Per-asset daily Rank ICs in Table~\ref{tab:rank_ic_breakdown} are calculated as Spearman's rank correlation between daily model scores $Y_{\mathrm{attr},t}$ and forward returns $R_{30,t}$ within each individual equity time series over the $T = 246$ out-of-sample trading days ($216$ asset-days with an observable target), whereas the pooled Rank IC ($-0.024$) evaluates rank ordering across all $1{,}512$ pooled asset-day observations. The mean per-asset daily Rank IC is $-0.045 \pm 0.032$ SE (panel mean across the seven equities), while the pooled cross-sectional monthly Rank IC on the eleven non-overlapping monthly rebalancing dates is $0.438 \pm 0.062$ SE (equal-weighted per-asset monthly mean $0.231 \pm 0.116$ SE). The two horizons disagree sharply. At the daily horizon nothing is identified: only AIRA ($+0.044$) and KZAP ($0.000$) are non-negative, the remaining five are negative down to KZTO ($-0.223$), and the panel mean is only $1.4$ standard errors from zero. At the monthly horizon the cross-section ranks coherently: six of the seven names are positive (KZAP $0.627$, AIRA $0.527$, KMGZ $0.300$, KEGC $0.255$, KZTK $0.173$, KCEL $0.027$), only KZTO is negative ($-0.291$), and the pooled monthly statistic is $7.1$ standard errors from zero. The OLS baseline still fits the bounded target marginally better (RMSE $12.09$ vs.\ $12.38$) and its pooled Rank IC is of the same order ($-0.046$ vs.\ $-0.024$), but it trails badly as a portfolio signal (net Sharpe $0.84$ vs.\ $2.58$). The pattern --- null daily IC, strongly positive monthly cross-sectional IC --- is the signature of a signal that carries little information when the panel is ordered over all $1{,}512$ pooled asset-days but re-orders the cross-section effectively at each rebalancing date, which is exactly how the portfolio in Section~\ref{subsubsec4_3_1} is constructed.
+\noindent\textbf{Selection ledger:} The pre-2025 scan is the Cartesian product $K\in\{3,5,7\}$, $r\in\{0.3,0.4,0.5,0.6\}$, and $\lambda\in\{1,10,100\}$, giving 36 trials. The validation window is the later half of the chronological 2022--2024 training panel; no 2025 row enters the scan. The selected trial is $(K,r,\lambda)=(3,0.4,100)$ with validation Rank IC $0.0832$ and $C=59.01$. The full per-trial ledger is supplied as \texttt{outputs/logs/frozen\_tuning.csv}; it contains validation IC, RMSE, MAE, $C$, and loss, but not the per-trial monthly portfolio returns or Sharpe ratios required for a proper DSR. We therefore make no 36-trial DSR claim and rely on the date-clustered confidence intervals and explicitly descriptive walk-forward results instead.
+
+\noindent\textbf{Contextualizing Rank IC Magnitude and Overlap Mechanics:} Per-asset daily Rank ICs are calculated within each equity time series, whereas the pooled statistic ranks all labelled asset-days. The frozen primary estimate is pooled daily IC $0.052$ (95\% CI $[-0.010,0.131]$) and monthly cross-sectional IC $0.201$ (date-clustered 95\% CI $[-0.013,0.432]$). Because monthly dates are a subset of daily dates, the explanation that monthly skill arises solely from re-ranking is not identified by these statistics; daily date-level ICs and offsets 1, 5, 10, and 15 are robustness diagnostics, not independent validation. The OLS baseline has lower target error but no evidence of a superior ranking signal. The KZTK dividend field is reported as a record date pending source verification, so no ex-date or yield claim is made.
 
 \begin{table}[htbp]
 \centering
 \small
-\caption{Asset-level Rank IC performance across the seven KASE study equities (2025 out-of-sample, 246 trading days)}
+\caption{Exploratory asset-level Rank IC performance for the deployed, test-informed $K=5$ sensitivity (2025 out-of-sample, unpurged; 246 trading days). These per-asset values are not the frozen primary estimate.}
 \label{tab:rank_ic_breakdown}
 \begin{tabular}{@{}llcc@{}}
 \toprule
 \textbf{Ticker} & \textbf{Asset Name} & \textbf{Daily Overlapping Rank IC} & \textbf{Monthly Non-Overlapping Rank IC} \\
 \midrule
-KZAP & NAC Kazatomprom             & 0.000 & 0.627 \\
-AIRA & Astana International Airport & 0.044 & 0.527 \\
-KMGZ & JSC NC KazMunayGas          & $-0.015$ & 0.300 \\
-KEGC & KEGOC                       & $-0.025$ & 0.255 \\
-KCEL & Kcell JSC                   & $-0.040$ & 0.027 \\
-KZTK & Kazakhtelecom               & $-0.052$ & 0.173 \\
-KZTO & KazTransOil                 & $-0.223$ & $-0.291$ \\
+KZAP & NAC Kazatomprom             & $-0.048$ & 0.627 \\
+AIRA & Astana International Airport & 0.050 & 0.527 \\
+KMGZ & JSC NC KazMunayGas          & 0.064 & 0.300 \\
+KEGC & KEGOC                       & 0.237 & 0.255 \\
+KCEL & Kcell JSC                   & $-0.132$ & 0.027 \\
+KZTK & Kazakhtelecom               & $-0.047$ & 0.173 \\
+KZTO & KazTransOil                 & $-0.063$ & $-0.291$ \\
 \midrule
-\textbf{Panel Mean (SE)}\textsuperscript{*} & — & \textbf{$-0.045$ (0.032)} & \textbf{0.231 (0.116)} \\
+\textbf{Panel Mean (SE)}\textsuperscript{*} & — & \textbf{$0.009$ (0.032)} & \textbf{0.231 (0.116)} \\
 \bottomrule
 \multicolumn{4}{p{0.92\textwidth}}{\footnotesize \textsuperscript{*}Note: per-asset standard errors are indicative sampling magnitudes only (daily column from a moving-block bootstrap over overlapping $R_{30}$ labels; monthly column over the eleven first-trading-day-of-month observations per asset), not IID $1/\sqrt{T}$ intervals, since overlapping forward returns are autocorrelated.}
 \end{tabular}
@@ -491,33 +561,35 @@ KZTO & KazTransOil                 & $-0.223$ & $-0.291$ \\
 
 AGM-date provenance: the Pre-AGM windows of Section~\ref{subsec3_4} are anchored on the dates in \texttt{config.yaml:agm\_dates} (KMGZ 2025-05-16, KZAP 2025-05-22, KEGC 2025-05-14, KZTO 2025-05-15, KCEL 2025-06-13, AIRA 2025-06-20, KZTK 2025-05-29; 2024 legs reuse the same month/day as a documented approximation). These are calendar anchors, not point-in-time exchange-filing timestamps; to the extent any date was fixed ex post, the masking evaluation carries mild lookahead. The 2025 test year contributes $208$ Pre-AGM asset-days ($205$ in the 2024 training leg).
 
-The portfolio selects the top $N_{\mathrm{long}} = 3$ equities based on monthly $Y_{\mathrm{attr},t}$ score rankings (equally weighted $33.3\%$ per position). Over the eleven non-overlapping monthly rebalances of 2025 the realised one-way turnover is $47\%$ of the book per month ($560\%$ annualized; symmetric-difference membership change $93\%$), reflecting the small opportunity set: with only seven eligible equities a single rank swap changes one third of the book. The OLS book turns over faster ($57\%$ one-way per month, $680\%$ annualized). Monthly return drag at one-way turnover $\tau$ and round-trip cost $c$ is $\tau \cdot c$: for TSK $0.070\%$ per month ($0.84\%$ annualized) at the 15-bps base tier, scaling linearly to $0.233\%$ per month ($2.80\%$ annualized) at 50 bps. The resulting net Sharpe ratio is $2.582$ at 15 bps and declines smoothly but stays well positive across the cost range, reaching $2.500$ at 35 bps and $2.440$ at 50 bps, against $0.837$ falling to $0.666$ for OLS. Because only eleven rebalance observations are available, the month-resampled 95\% confidence interval on the base-tier Sharpe is wide ($[0.67, 5.55]$) and the point estimate should be read as indicative rather than established.
+The primary portfolio uses the frozen $K=3$ specification. Over eleven monthly rebalances its one-way turnover is $53\%$ per month and the net Sharpe is $0.983$ at 15 bps, $0.919$ at 50 bps, and $0.737$ at 150 bps. The month-resampled 95\% interval is $[-1.45,2.52]$, so this single-year result is indicative rather than established. The deployed $K=5$ setting is shown only as sensitivity ($1.944$ at 15 bps and $1.349$ at 150 bps). Execution is assumed after the day-$t$ close used by the features; the forward label is not an executable same-close fill. The supplied KZTK date is a 25-May record date, not a verified ex-date, and the payout comparison mixes percent-of-profit actuals with percent-of-FCFE targets.
 
-Table~\ref{tab:tcost_sensitivity} summarizes the sensitivity across cost tiers for the two models actually fitted (TSK and OLS). TSK leads OLS at every evaluated tier and the gap widens slightly with cost (TSK $-0.0041$ Sharpe points per bp against OLS $-0.0049$), so there is no in-range break-even cost at which OLS catches TSK --- the ranking holds across the evaluated range. That robustness is qualified by the level: the $15$-bps base tier is defensible as a reporting convention but optimistic for KASE execution in these names (KCEL, KEGC, and KZTO routinely print $40$--$150$ bps quoted spreads on the main board, with non-trivial impact for AIRA and KMGZ), so even the $50$-bps tier should be read as the friendlier end of realistic costs and live implementation would face wider effective spreads.
+Table~\ref{tab:tcost_sensitivity} summarizes the frozen and deployed sensitivity across cost tiers. The extended 100--150 bps range is included because quoted spreads can exceed the 50-bps reporting convention.
 
 \begin{table}[htbp]
 \centering
 \small
 \caption{Net Sharpe ratio sensitivity across total round-trip execution cost tiers (2025 out-of-sample, eleven monthly rebalances)}
 \label{tab:tcost_sensitivity}
-\begin{tabular}{@{}lcccc@{}}
+\begin{tabular}{@{}lrrrrrrr@{}}
 \toprule
-\textbf{Model} & \textbf{15 bps (Base)} & \textbf{25 bps} & \textbf{35 bps} & \textbf{50 bps} \\
+\textbf{Model} & \textbf{15} & \textbf{25} & \textbf{35} & \textbf{50} & \textbf{75} & \textbf{100} & \textbf{150 bps} \\
 \midrule
-Proposed TSK (CLV) & \textbf{2.582} & \textbf{2.541} & \textbf{2.500} & \textbf{2.440} \\
-OLS                & 0.837          & 0.788          & 0.740          & 0.666          \\
+Frozen TSK (CLV) & \textbf{0.983} & \textbf{0.965} & \textbf{0.947} & \textbf{0.919} & \textbf{0.874} & \textbf{0.828} & \textbf{0.737} \\
+Deployed TSK (sensitivity) & 1.944 & 1.900 & 1.856 & 1.790 & 1.680 & 1.569 & 1.349 \\
+OLS                & 0.992          & 0.945          & 0.897          & 0.826 & 0.708 & 0.589 & 0.353 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+\iffalse
 \subsection{Tier-2 Feature-Set Evaluation under Training-Resampling Seeds}\label{subsec4_tier2}
 
-The enrichment of Section~\ref{subsubsec3_1_2} is evaluated by re-running the identical ANFIS protocol (2022--2024 train $\rightarrow$ 2025 out-of-sample) on four nested input vectors: \emph{baseline} (the canonical three inputs, raw scaling), \emph{microstructure} (baseline $+$ the five trailing OHLC columns, eight inputs), \emph{fundamentals} (baseline $+$ the three as-of slow columns, six inputs), and \emph{full} (all eleven inputs); every Tier-2 vector uses the train-fitted min-max path. Because the pipeline is otherwise deterministic --- subtractive clustering, the least-squares solve of Eq.~\eqref{eq:ls}, and gradient descent all run to fixed stopping criteria --- a single training draw cannot be distinguished from its resampling neighbours, and a one-seed comparison would overstate any feature-set gain. Each set is therefore retrained on five i.i.d.\ row bootstraps of the $4{,}278$-row 2022--2024 training panel (seeds $20250921$--$20250925$, drawn after matrix assembly so clustering, the consequent solve, and width updates all see the resampled rows); the 2025 test panel is never resampled, so out-of-sample scoring stays exact. Table~\ref{tab:tier2_features} reports mean $\pm$ SE across the five draws; because the only randomness is the training draw, these intervals quantify \emph{training-draw stability}, not market-time variation, and are narrower than any time-series confidence interval.
+The enrichment of Section~\ref{subsubsec3_1_2} is exploratory and is not part of the frozen primary result. It re-runs the 2022--2024 $\rightarrow$ 2025 protocol on four nested input vectors; Tier-2 uses train-fitted min--max scaling and does not apply the primary 30-trading-day embargo. Each set is retrained on five row bootstraps, so Table~\ref{tab:tier2_features} reports training-draw stability only, not an embargoed out-of-sample claim.
 
 \begin{table}[htbp]
 \centering
 \small
-\caption{Tier-2 feature-set comparison: same ANFIS protocol, five training-bootstrap seeds, evaluated out-of-sample on the 2025 calendar year. Mean $\pm$ SE across seeds; Pooled Rank IC is computed over all labelled asset-days.}
+\caption{Exploratory Tier-2 feature-set comparison: five training-bootstrap seeds, unpurged 2022--2024 $\rightarrow$ 2025 evaluation. Mean $\pm$ SE across seeds; these values are not the frozen primary specification.}
 \label{tab:tier2_features}
 \begin{tabular}{@{}lcccccc@{}}
 \toprule
@@ -531,26 +603,50 @@ full              & 11 & 115 & $\mathbf{0.049 \pm 0.018}$   & $14.14 \pm 0.50$ &
 \end{tabular}
 \end{table}
 
-Three readings follow. First, the multi-scale microstructure block still carries the Tier-2 ranking signal, but the margin over baseline is modest: its pooled Rank IC is positive on all five training draws ($+0.045 \pm 0.009$, per-seed range $[0.031, 0.082]$) against a baseline that straddles zero ($+0.019 \pm 0.021$, range $[-0.047, +0.074]$), and the base-tier net Sharpe rises from $1.47$ to $2.17$ --- directional evidence rather than a significance claim, and the Sharpe ordering is not seed-stable (on the plain, unbootstrapped panel the ordering flips and the baseline leads, $2.58$ against $2.26$). Second, the point-in-time fundamentals block remains consistently \emph{worse} than baseline (IC $-0.041 \pm 0.002$, negative on every draw), and the reason is visible in the data rather than assumed: the annual total rows for 2022--2023 carry no EBITDA and no 2025 annual has been published, so \texttt{ebitda\_growth} is degenerate (identically zero across all $4{,}278$ training rows), while \texttt{nd\_ebitda} and \texttt{fcfe\_to\_ebitda} take only four and three distinct values per asset respectively --- coarse step functions that act as near-constant cross-sectional intercepts rather than time-varying information. Third, stacking both blocks (\emph{full}) retains the ranking gain ($0.049 \pm 0.018$, the highest mean of the four) but gives back most of the return ($1.52$ against $2.17$), so mixing the blocks buys no ranking and costs Sharpe: feature-set selection matters more than feature-set size at this sample scale. The target-space error still moves opposite to the rank metrics for the enriched sets (RMSE $15.13$ vs.\ $12.29$ for baseline even as Rank IC improves), which is expected: the bounded $\tanh$ target of Eq.~\eqref{eq:bounded_target} compresses tails, so a scorer can rank better while regressing worse, and RMSE against a near-noise target is not the criterion this framework optimises. Monthly mark-to-forward IC likewise does not improve under enrichment (microstructure $0.05 \pm 0.02$ vs.\ baseline $0.19 \pm 0.05$), reinforcing that the binding constraint remains sample length rather than input richness. Finally, a deflated-Sharpe check over all $20$ trials ($4$ sets $\times$ $5$ seeds) returns $\mathrm{DSR} = 0.00$: an observed Sharpe of $2.45$ falls below the deflated threshold of $7.53$ once the number of configurations tried is accounted for, so the portfolio-level ordering is not distinguishable from chance. The ranking edge is the claim this table supports; the Sharpe edge is not.
+Three readings follow. First, the multi-scale microstructure block still carries the Tier-2 ranking signal, but the margin over baseline is modest: its pooled Rank IC is positive on all five training draws ($+0.045 \pm 0.009$, per-seed range $[0.031, 0.082]$) against a baseline that straddles zero ($+0.019 \pm 0.021$, range $[-0.047, +0.074]$), and the base-tier net Sharpe rises from $1.47$ to $2.17$ --- directional evidence rather than a significance claim, and the Sharpe ordering is not seed-stable (on the plain, unbootstrapped panel the ordering flips and the baseline leads, $0.99$ against $0.98$). Second, the point-in-time fundamentals block remains consistently \emph{worse} than baseline (IC $-0.041 \pm 0.002$, negative on every draw), and the reason is visible in the data rather than assumed: the annual total rows for 2022--2023 carry no EBITDA and no 2025 annual has been published, so \texttt{ebitda\_growth} is degenerate (identically zero across all $4{,}278$ training rows), while \texttt{nd\_ebitda} and \texttt{fcfe\_to\_ebitda} take only four and three distinct values per asset respectively --- coarse step functions that act as near-constant cross-sectional intercepts rather than time-varying information. Third, stacking both blocks (\emph{full}) retains the ranking gain ($0.049 \pm 0.018$, the highest mean of the four) but gives back most of the return ($1.52$ against $2.17$), so mixing the blocks buys no ranking and costs Sharpe: feature-set selection matters more than feature-set size at this sample scale. The target-space error still moves opposite to the rank metrics for the enriched sets (RMSE $15.13$ vs.\ $12.29$ for baseline even as Rank IC improves), which is expected: the bounded $\tanh$ target of Eq.~\eqref{eq:bounded_target} compresses tails, so a scorer can rank better while regressing worse, and RMSE against a near-noise target is not the criterion this framework optimises. Monthly mark-to-forward IC likewise does not improve under enrichment (microstructure $0.05 \pm 0.02$ vs.\ baseline $0.19 \pm 0.05$), reinforcing that the binding constraint remains sample length rather than input richness. No deflated-Sharpe value is reported for this exploratory Tier-2 block because its trial-level return series are not part of the retained ledger; the ranking and Sharpe figures are descriptive only.
 
-\subsection{Ablation Study and Adversarial Reconstruction Protocol}\label{subsec4_4}
+\fi
+\subsection{Rule-Concentration Diagnostic and Dispersion-Adaptive Masking Evaluation}\label{subsec4_4}
 
-\noindent\textbf{Adversarial Reconstruction Protocol:} To evaluate anti-frontrunning efficacy, we model an external high-frequency trader attempting to reconstruct internal scoring logic by fitting a Support Vector Regressor (SVR with RBF kernel, $C=1.0$, $\gamma=\text{'scale'}$) on observable market inputs $\mathbf{x}_t$. Because the masking of Section~\ref{subsec3_4} is armed only inside the Pre-AGM windows, the adversary is restricted to exactly those observations: it is trained on the 2024 Pre-AGM panel ($N = 205$ asset-days) and evaluated out-of-sample on the 2025 Pre-AGM panel ($N = 208$ asset-days). The adversary operates under a strict single-query budget: $Q = 1$ observation vector per trading day per equity. The shuffled-target control ($R^2 = -0.146$) confirms the adversary is genuinely learning the input-to-score map rather than exploiting structure in the labels, and it recovers $R^2 = 0.284$ when trained on unmasked scores. \emph{Arming the masking does not reduce this:} the adversary trained and scored with $\alpha = 0.05$ still attains $R^2 = 0.282$ --- a gap of $0.002$ against a $0.43$ control spread. The mechanism is measurable: a $5\%$ multiplicative perturbation of the rule weights moves the pre-AGM score by only $0.103$ points on average (25 draws) against a mean per-date cross-sectional score dispersion of $1.94$ points, and the perturbation is largely renormalised away whenever the firing strength is concentrated on one dominant rule, so the map an adversary learns is effectively unchanged. What Proposition~\ref{prop:bias} guarantees is a bound on the \emph{bias} of the deployed score, and that guarantee holds: the realised pre-AGM bias is $-0.0013$ signed and $0.0070$ in absolute value, comfortably inside the $0.0625$ bound. What it does not deliver --- and what we therefore explicitly do not claim --- is adversarial \emph{degradation}: on this model the masking preserves the expected value of the score while leaving its predictability intact. Because the deployed path is unbiased either way, the scoring metrics are unchanged between the $\alpha=0$ and $\alpha=0.05$ rows below.
+\noindent\textbf{Adversarial Reconstruction Protocol:} To evaluate masking efficacy against model reconstruction, we model an external party attempting to reconstruct internal scoring logic by fitting a Support Vector Regressor (SVR with RBF kernel, $C=1.0$, $\gamma=\text{'scale'}$) on observable market inputs $\mathbf{x}_t$. Because the masking of Section~\ref{subsec3_4} is armed only inside the Pre-AGM windows, the adversary is restricted to exactly those observations: it is trained on the 2024 Pre-AGM panel ($N = 205$ asset-days) and evaluated out-of-sample on the 2025 Pre-AGM panel ($N = 208$ asset-days). All results in this subsection use the frozen primary $K=3$ model; the test-informed deployed model is reported only as a sensitivity. The adversary operates under a strict single-query budget: $Q = 1$ observation vector per trading day per equity. This is the most favourable case for the defender: as Remark~\ref{rem:threat_model} establishes, an adversary with unlimited queries ($Q \gg 1$) can average out independently redrawn masking noise, so the $Q=1$ protocol bounds masking efficacy from above rather than characterising it. Critically, every $R^2$ below is scored against the \emph{unmasked} test scores (fidelity to the clean model), never against masked labels. The reported values are conditional single-panel, single-seed diagnostics; they are not confidence intervals over the 208 rows. The adversary is weak by construction: untuned, trained on $205$ rows, and denied the unmasked history outside the armed windows. No link is claimed between reconstruction $R^2$ and any trading loss: the protected object is the rule base as intellectual property (model-extraction defence). The adversary recovers $R^2 = 0.533$ when trained on unmasked scores. \emph{Fixed masking does not reduce this:} the same-seed adversary trained on $\alpha=0.05$ scores attains $R^2=0.530$.
 
-Table~\ref{tab:ablation} presents the masking ablation against this SVR adversary: the two scoring rows are statistically indistinguishable, and the shuffled-target control sets the noise floor at $-0.146$. The range-imbalance mode ablation (tick rule, CLV-excluded) remains deferred.
+\noindent\textbf{Rule-concentration diagnostic:} Proposition~\ref{thm:masking} frames the fixed-masking null reported above, but does not predict it on its own. On the frozen 2025 Pre-AGM panel ($N=208$), the median effective rule count is $K_{\mathrm{eff}}=1.40$ (mean $1.66$, max $3.00$ of $K=3$), with median amplification $\Lambda=0.13$. The variance identity validates cleanly: across $\alpha \in \{0.01,0.05,0.10,0.20\}$ the truncation-calibrated prediction matches Monte-Carlo masked-output variance with cross-row correlation $0.997$--$0.998$ and median empirical/predicted ratios $0.995$--$1.020$ at every scale. The deployed $K=5$ values are retained only as a sensitivity and are not substituted into the frozen result.
+
+\noindent\textbf{Adaptive masking result (fidelity, not dilution):} Inverting Proposition~\ref{thm:masking} per observation at target noise $\epsilon_{\mathrm{target}}=2.0$, with $\alpha_{\max}=1.0$, gives median $\alpha_t=1.00$ and a $77.2\%$ cap-binding rate on the frozen $K=3$ model. Scored against the clean test scores, the same SVR adversary attains fidelity $R^2=0.377$ on the seeded adaptive draw, down from $0.533$ unmasked and $0.530$ fixed-masked. Keyed fixed masking at $\alpha=1.0$ gives $R^2=0.453$ for $Q=1$ and the same $0.453$ for repeated $Q=25$ responses. These are descriptive single-seed results, not sampling confidence intervals or security guarantees; the adaptive signed bias is $-0.313$ points and its mean absolute perturbation is $0.972$ points in this run. The frozen-model audit therefore supplies the adversarial fidelity that the earlier variance-only transfer check lacked, while retaining the caveats about panel dependence, query averaging, and adaptive-scale leakage.
+
+\noindent\textbf{Sensitivity scope:} The earlier deployed $K=5$, test-informed audit remains available as a sensitivity analysis only. Its materially different concentration and cap regime must not be read as evidence for the frozen protocol.
+
+\noindent\textbf{Cap-binding regime:} The calibrated target is reachable only on the $22.8\%$ of frozen-model rows where $\alpha_t < \alpha_{\max}$; on the $77.2\%$ of rows where $\alpha_t$ hits $\alpha_{\max}=1.0$, the target is unreachable. Because $\alpha_t=2\epsilon_{\mathrm{target}}/\sqrt{\kappa_{\mathrm{trunc}} S_t}$ grows as $S_t$ shrinks, the cap binds precisely on rows of smallest consequent dispersion --- the concentrated-firing rows. This describes injected noise, not protection. The cap rate is reported with every result so the achieved rather than targeted noise floor remains visible. Per-tercile figures below are descriptive; their non-monotone ordering is not evidence of a statistically established adaptive advantage.
+
+\noindent\textbf{Matched-noise comparison (fidelity):} In the frozen audit, fixed masking at $\alpha=1.0$ realises noise SD $1.54$ and attains fidelity $R^2=0.338$, compared with adaptive's $0.377$ on the same seeded protocol. This comparison is descriptive and conditional on one serially dependent panel and mask draws; without a joint row/date bootstrap it does not establish an adaptive advantage. The earlier deployed matched-noise comparison is not part of the frozen primary result.
+
+\noindent\textbf{Per-row reconstruction error (concentrated rows):} The frozen audit also reports tercile values descriptively over roughly $70$ rows in the lowest $S_t$ tercile; these single-draw values are not inferential evidence. In that tercile, unmasked, fixed, matched-fixed, and adaptive fidelity are respectively $0.439$, $0.450$, $0.478$, and $0.501$. The masked values exceeding the unmasked value are consistent with sampling and fit noise; no per-row advantage is claimed. The deployed-model tercile table is retained only as a sensitivity artifact and is not used for the frozen protocol conclusion.
+
+\noindent\textbf{Noise--efficacy trade-off:} In the frozen audit, adaptive $\epsilon_{\mathrm{target}}=2.0$ has signed bias $-0.313$ points and mean absolute perturbation $0.972$ points in the seeded run. These are a noise-cost diagnostic and not a bias estimate with sampling uncertainty. No multi-seed frontier is claimed for the frozen model here.
+
+\noindent\textbf{Query-budget averaging (Remark~\ref{rem:threat_model}):} For the frozen model, keyed fixed masking with a server-side secret and asset/date key gives fidelity $R^2=0.453$ for $Q=1$ and remains $0.453$ for repeated $Q=25$ responses because the same key returns the same value. This is a measured single-key result, not a security guarantee: key compromise, cross-key observations, and adaptive-scale leakage remain outside scope. The in-window restriction assumes an authenticated client can query scores only during the 30 trading days before an AGM, while clean scores outside that window are observable to a separate public or internal history; without that access asymmetry, the in-window experiment is not the relevant threat model.
+
+\noindent\textbf{Exploratory sensitivity frontier:} The earlier multi-draw $R^2$--noise frontier was generated for the deployed, test-informed $K=5$ model. It is not evidence for the frozen protocol and is omitted from the frozen quantitative conclusion.
+
+\noindent\textbf{Attacker-strength limitation:} Strong-extractor and clean out-of-window results currently belong to the deployed sensitivity audit, not the frozen primary model. They therefore establish only that the deployed defense can be overturned, not a measured upper bound for the frozen scorer. The frozen result is deliberately limited to the untuned in-window SVR and keyed repeated-query check reported above.
+
+Table~\ref{tab:ablation} collects the full ablation: scoring metrics are identical across masking variants (masking touches only Pre-AGM rows and is mean-zero), while reconstruction fidelity separates them. The directional-mode ablation (tick rule, CLV-excluded) remains deferred.
 
 \begin{table}[htbp]
 \centering
 \small
-\caption{Ablation of Pre-AGM masking against the SVR reconstruction adversary (Pre-AGM panels; $N=205$ train, $N=208$ test)}
+\caption{Frozen-primary Pre-AGM masking audit against the SVR reconstruction adversary ($K=3$, radius $0.4$, ridge $100$; $N=205$ train, $N=208$ test). No 30-day embargo is applied to this masking panel. Reconstruction $R^2$ is fidelity to the unmasked model on a single seeded audit, scored on clean test scores; these values are descriptive and do not represent sampling confidence intervals. The absolute-deviation column is reported separately as noise magnitude, not bias.}
 \label{tab:ablation}
-\begin{tabular}{@{}lccc@{}}
+\begin{tabular}{@{}lccccc@{}}
 \toprule
-\textbf{Variant} & \textbf{RMSE} & \textbf{Pooled Rank IC} & \textbf{Reconstruction Rate ($R^2$)} \\
+\textbf{Variant} & \textbf{RMSE} & \textbf{Pooled Rank IC} & \textbf{Fidelity $R^2$} & \textbf{Signed bias} & \textbf{Mean abs.\ perturbation} \\
 \midrule
-Full TSK (CLV, $\alpha=0.05$)     & 12.38 & $-0.024$ & 0.282 \\
-TSK, CLV, no masking ($\alpha=0$) & 12.38 & $-0.024$ & 0.284 \\
-Shuffled-target control           & —     & —     & $-0.146$ \\
+No masking ($\alpha=0$) & --- & --- & 0.533 & --- & --- \\
+Fixed masking ($\alpha=0.05$) & --- & --- & 0.530 & --- & --- \\
+Fixed masking ($\alpha=1.0$, matched noise) & --- & --- & 0.338 & --- & $0.901$ \\
+\textbf{Adaptive masking ($\boldsymbol{\epsilon}=2.0$)} & --- & --- & 0.377 & $\mathbf{-0.313}$ & $\mathbf{0.972}$ \\
+Keyed fixed masking ($\alpha=1.0$) & --- & --- & $0.453$ ($Q=1=Q=25$) & $-0.155$ & $1.010$ \\
+Shuffled-target control & --- & --- & $-0.146$ & --- & --- \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -560,18 +656,17 @@ Shuffled-target control           & —     & —     & $-0.146$ \\
 
 \subsection{Interpretation in Small Sample Regimes}\label{subsec5_1}
 
-The combination of trailing $\mathrm{VWAP}_{t-1}$, log-volume regularization, and CLV provides a bounded, lookahead-free signal, and with three years of training history the fuzzy scorer now earns its keep on the portfolio: the four-parameter OLS baseline still fits the bounded target marginally better (RMSE $12.09$ vs.\ $12.38$) but is outperformed on the base-tier net Sharpe ($2.58$ vs.\ $0.84$) by the fuzzy scorer with $35$ free trainable parameters --- the fit-versus-rank trade-off of Section~\ref{subsec4_3}, not a forecasting claim. Interpretability is preserved for corporate treasury boards at low parameter overhead (e.g., \emph{"IF $Dev_{\mathrm{Price}}$ is High AND $Dev_{\mathrm{Volume}}$ is Extreme AND $\mathrm{CLV}$ is Positive THEN Attractiveness Score is High"}), alongside the bounded-bias masking guarantee of Section~\ref{subsec3_4} --- though, as Section~\ref{subsec4_4} establishes, that guarantee bounds the score's bias and not its predictability. The per-asset results are heterogeneous along the horizon rather than clustered into asset-level regimes: on the daily horizon every name is weak and the panel mean is only $1.4$ standard errors from zero (best AIRA $+0.044$, worst KZTO $-0.223$), whereas on the monthly horizon six of the seven rank positively (KZAP $0.627$, AIRA $0.527$, KMGZ $0.300$, KEGC $0.255$, KZTK $0.173$, KCEL $0.027$) with only KZTO negative ($-0.291$). The cross-sectional monthly IC being strongly positive ($0.438$, $7.1$ standard errors from zero) while the pooled asset-day IC is essentially zero ($-0.025$ from the same scores, $[-0.091, 0.078]$) is the expected signature of a signal with weak panel-wide ordering power but effective re-ranking at each rebalancing date --- precisely the operation the top-$N$ portfolio performs. With only eleven non-overlapping rebalances, however, the sample size remains the binding constraint on all of these magnitudes: the base-tier Sharpe interval spans $[0.67, 5.55]$, and a deflated-Sharpe check over the feature-set and seed trials of Section~\ref{subsec4_tier2} returns $\mathrm{DSR} = 0.00$, so the directional reading should be carried as indicative rather than established.
+Under the frozen protocol the scorer has 21 free trainable parameters and a 15-bps net Sharpe of $0.98$; the test-informed deployed setting is higher ($1.94$) but is reported only as sensitivity. Neither estimate establishes forecasting skill: the frozen monthly cross-sectional IC is $0.201$ with a date-clustered 95\% interval of $[-0.013,0.432]$, and the pooled asset-day IC is $0.052$ with interval $[-0.010,0.131]$. The three-fold walk-forward mean is $0.161$ with a $t$-interval of $[-0.015,0.338]$ for IC and $0.65$ with $[-0.266,1.569]$ for Sharpe. The supplied KZTK $26{,}664.88$~KZT/share special-dividend record date is 2025-05-25 (a Sunday), not a verified exchange ex-date; it must not be described as an ex-date until the source field is corrected. Labels are dividend-adjusted throughout (\texttt{data/raw/financials/dividends.csv}: 26 paid rows; cancelled declarations excluded).
 
 \subsection{Deployment Considerations: Defense-in-Depth Framing}\label{subsec5_2}
 
-The stochastic masking mechanism should be understood as a defense-in-depth measure, not an isolated security guarantee. Because an adversary with unlimited query access ($Q \gg 1$) can average out the zero-mean noise $\xi_{k,t}$, production deployment requires pairing internal algorithm masking with rate-limiting, query authentication, and randomized TWAP/VWAP algorithmic execution schedules to mitigate timing-based front-running in live trading environments.
+The stochastic masking mechanism should be understood as a defense-in-depth measure for model-extraction friction, not front-running protection or an isolated security guarantee. The Section~\ref{subsec4_4} audit shows that $Q = 25$ independent queries restore in-window fidelity and clean out-of-window history recovers the static model under every independently redrawn scheme. A keyed response prevents averaging only for the same key, as the keyed audit demonstrates; it does not solve key compromise or leakage through adaptive noise scale. Production use therefore requires an explicit observability policy, authentication, rate-limiting, and query-pattern detection; no trading-loss claim is made.
 
 %=====================================================================
 \section{Conclusion}\label{sec6}
 
-This paper presents a first-order TSK fuzzy inference framework for emerging market equity scoring, pairing a Close-Location Value proxy with a defense-in-depth stochastic masking mechanism. Trained on the 2022--2024 calendar years of KASE daily bars ($4{,}278$ pooled asset-days) and evaluated strictly out-of-sample over the complete 2025 calendar year, the framework achieves a mean per-asset daily Rank IC of $-0.045 \pm 0.032$ SE and a pooled cross-sectional monthly Rank IC of $0.438 \pm 0.062$ SE --- daily ordering power indistinguishable from zero alongside a strong monthly re-ranking signal over the eleven available rebalances --- and a net Sharpe ratio of $2.58$ at 15 bps round-trip execution costs ($2.44$ at 50 bps), while a four-parameter OLS baseline on identical features reaches $0.84$ ($0.67$). The Sharpe point estimate does not survive multiple-testing correction (deflated Sharpe $\mathrm{DSR} = 0.00$ over the $20$ Tier-2 trials; Section~\ref{subsec4_tier2}), so the defensible portfolio claim is directional rather than established. We therefore report a split result: null daily forecasting skill, but a monthly cross-sectional ranking signal that drives the portfolio outcome on this four-year emerging-market sample. The security objective, by contrast, is only partially met: restricting the adversarial protocol to the Pre-AGM windows, a single-query SVR adversary recovers $R^2 = 0.284$ unmasked and $R^2 = 0.282$ masked (shuffled-target control $-0.146$) at a realised absolute bias of $0.0070$ against the $0.0625$ bound --- arming the masking does not reduce reconstruction, so masking remains a defense-in-depth measure rather than an established anti-frontrunning guarantee, requiring rate-limiting, query authentication, and randomized execution schedules in production. Two extensions follow directly: monthly rolling re-calibration on the now-canonical three-year training window, and the annual-horizon evaluation that requires 2026 bars; the multi-horizon reporting protocol of Section~\ref{subsec4_tier2} already runs unchanged on that window. The Tier-2 enrichment audit (Section~\ref{subsec4_tier2}) adds a qualified positive result within the same protocol: under five training-bootstrap seeds, the multi-scale trailing-OHLC block lifts pooled Rank IC from $0.019 \pm 0.021$ (baseline) to $0.045 \pm 0.009$ and base-tier net Sharpe from $1.47$ to $2.17$, while point-in-time fundamentals are consistently worse than baseline ($-0.041 \pm 0.002$) and naive stacking of both blocks gives back most of the return gain ($1.52$ against $2.17$) --- evidence that at this sample scale lookahead-free feature \emph{selection}, not richness, drives ranking quality, and that these intervals measure training-draw stability rather than market-time significance.
+The primary contribution is a transparent masking variance identity and its calibrated, row-wise implementation, not a demonstrated defense or finance signal. On the frozen primary model, the seeded in-window SVR fidelity is $0.533$ without masking, $0.530$ with fixed $\alpha=0.05$, and $0.377$ with adaptive masking at $\epsilon=2.0$; keyed repeated-query fidelity is $0.453$ for both $Q=1$ and $Q=25$. These conditional diagnostics show limited extraction friction rather than a security guarantee, and the deployed test-informed audit is only a sensitivity. After freezing all 36 hyperparameter trials on pre-2025 data and applying a 30-trading-day embargo, the 2025 frozen specification gives monthly IC $0.201$ (date-clustered 95\% CI $[-0.013,0.432]$) and net Sharpe $0.983$ at 15 bps, falling to $0.737$ at 150 bps. The trial ledger reports validation IC, RMSE, MAE, $C$, and loss; it does not support a proper trial-level DSR, so no 36-trial DSR is claimed. The supplied dividend file is used for labels, but its KZTK 2025-05-25 field is a Sunday record date rather than a verified exchange ex-date; payout comparisons also mix percent-of-profit actuals with percent-of-FCFE targets. These limitations, the small number of monthly rebalances, and the absence of a validated finance or security advantage define this as a negative protocol result.
 
-%=====================================================================
 \begin{thebibliography}{99}
 
 \bibitem{zadeh1965}
@@ -582,9 +677,6 @@ Takagi, T., Sugeno, M.: Fuzzy identification of systems and its applications to 
 
 \bibitem{jang1993}
 Jang, J.-S.R.: ANFIS: adaptive-network-based fuzzy inference system. IEEE Transactions on Systems, Man, and Cybernetics 23(3), 665--685 (1993)
-
-\bibitem{hasbrouck1991}
-Hasbrouck, J.: Measuring the information content of stock trades. The Journal of Finance 46(1), 179--207 (1991)
 
 \bibitem{leeready1991}
 Lee, C.M., Ready, M.J.: Inferring trade direction from intraday data. The Journal of Finance 46(2), 733--746 (1991)
@@ -598,28 +690,53 @@ Easley, D., López de Prado, M.M., O'Hara, M.: Flow toxicity and liquidity in a 
 \bibitem{cont2014}
 Cont, R., Kukanov, A., Stoikov, S.: The price impact of order book events. Journal of Financial Econometrics 12(1), 47--88 (2014)
 
-\bibitem{biggio2013}
-Biggio, B., Corona, I., Maiorca, D., Nelson, B., \v{S}rndi\'{c}, N., Laskov, P., Giacinto, G., Roli, F.: Evasion attacks against machine learning at test time. In: European Conference on Machine Learning and Principles and Practice of Knowledge Discovery in Databases (ECML PKDD), pp. 387--402. Springer (2013)
-
-\bibitem{goodfellow2015}
-Goodfellow, I.J., Shlens, J., Szegedy, C.: Explaining and harnessing adversarial examples. International Conference on Learning Representations (ICLR) (2015)
-
 \bibitem{cartea2015}
 Cartea, Á., Jaimungal, S., Penalva, J.: Algorithmic and High-Frequency Trading. Cambridge University Press (2015)
 
-\bibitem{kurakin2017}
-Kurakin, A., Goodfellow, I., Bengio, S.: Adversarial machine learning at scale. International Conference on Learning Representations (ICLR) (2017)
+\bibitem{bailey2014}
+Bailey, D.H., L\'opez de Prado, M.: The deflated Sharpe ratio: correcting for selection bias, backtest overfitting and non-normality. Journal of Portfolio Management 40(5), 94--107 (2014). \url{https://doi.org/10.3905/jpm.2014.40.5.094}
+
+\bibitem{corwin2012}
+Corwin, S.A., Schultz, P.: A simple way to estimate bid-ask spreads from daily high and low prices. Journal of Finance 67(2), 719--760 (2012). \url{https://doi.org/10.1111/j.1540-6261.2012.01729.x}
+
+\bibitem{chordia2001}
+Chordia, T., Roll, R., Subrahmanyam, A.: Market liquidity and trading activity. Journal of Finance 56(2), 501--530 (2001). \url{https://doi.org/10.1111/0022-1082.00335}
+
+\bibitem{fama2008}
+Fama, E.F., French, K.R.: Dissecting anomalies. Journal of Finance 63(4), 1653--1678 (2008). \url{https://doi.org/10.1111/j.1540-6261.2008.01371.x}
+
+\bibitem{fong2017}
+Fong, K.Y.L., Holden, C.W., Trzcinka, C.A.: What are the best liquidity proxies for global research? Review of Finance 21(4), 1355--1401 (2017). \url{https://doi.org/10.1093/rof/rfx003}
+
+\bibitem{rubio2021}
+Rubio, J.J., Garcia, E., Aquino, G., Aguilar-Ibanez, C., Pacheco, J., Gutierrez, A.: ANFIS-based forecasting with noise-robustness analysis with application to demand and price prediction. Applied Soft Computing 105, 107219 (2021). \url{https://doi.org/10.1016/j.asoc.2021.107219}
+
+\bibitem{skrjanc2019}
+Skrjanc, I., Iglesias, J.A., Sanchis, A., Leite, D., Lughofer, E., Gomide, F.: Evolving fuzzy and neuro-fuzzy approaches in clustering, regression and classification: a survey. Information Sciences 490, 344--368 (2019). \url{https://doi.org/10.1016/j.ins.2019.03.060}
 
 \bibitem{li2018}
-Li, C., Li, F., et al.: An extended Takagi--Sugeno--Kang inference system (TSK+) with fuzzy interpolation and its rule base generation. Soft Computing (2018). \url{https://doi.org/10.1007/s00500-017-2925-8}
+Li, J., Yang, L., Qu, Y., Sexton, G.: An extended Takagi--Sugeno--Kang inference system (TSK+) with fuzzy interpolation and its rule base generation. Soft Computing 22(11), 3155--3170 (2018). \url{https://doi.org/10.1007/s00500-017-2925-8}
 
-\bibitem{zhang2024}
-% VERIFY BEFORE PUBLICATION: author/title/venue/DOI combination could not be confirmed against publisher pages (the DOI resolves to a different article). Replace with the exact surveyed source or remove the citation.
-Zhang, Y., Liu, X., Wang, L.: Modern architectures and stacked TSK fuzzy inference engines: A comprehensive survey. Information Sciences 652, 118--139 (2024). \url{https://doi.org/10.1016/j.ins.2023.119615} [Reference details unverified --- confirm against publisher page.]
+\bibitem{tramer2016}
+Tram{\`e}r, F., Zhang, F., Juels, A., Reiter, M.K., Ristenpart, T.: Stealing machine learning models via prediction APIs. In: 25th USENIX Security Symposium (USENIX Security 16), pp. 601--618. USENIX Association, Austin, TX (2016)
 
-\bibitem{alves2024}
-% VERIFY BEFORE PUBLICATION: author/title/venue/DOI combination could not be confirmed against publisher pages (the DOI resolves to a different article). Replace with the exact cited source or remove the citation.
-Alves, R., Santos, M., Costa, B.: Evolving TSK fuzzy models for non-stationary financial time series forecasting. Applied Soft Computing 150, 111050 (2024). \url{https://doi.org/10.1016/j.asoc.2023.111050} [Reference details unverified --- confirm against publisher page.]
+\bibitem{cohen2019}
+Cohen, J., Rosenfeld, E., Kolter, J.Z.: Certified adversarial robustness via randomized smoothing. In: International Conference on Machine Learning, pp. 1310--1320 (2019)
+
+\bibitem{dwork2006}
+Dwork, C., McSherry, F., Nissim, K., Smith, A.: Calibrating noise to sensitivity in private data analysis. In: Theory of Cryptography Conference, pp. 265--284. Springer (2006)
+
+\bibitem{orekondy2019}
+Orekondy, T., Sch{\"o}nfeld, D., Fritz, M.: Knockoff nets: stealing functionality of black-box models. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 4954--4963 (2019)
+
+\bibitem{orekondy2020}
+Orekondy, T., Schiele, B., Fritz, M.: Prediction poisoning: towards defenses against DNN model stealing attacks. In: International Conference on Learning Representations (ICLR) (2020). \url{https://doi.org/10.48550/arXiv.1906.10908}
+
+\bibitem{lee2019}
+Lee, T., Edwards, B., Molloy, I., Su, D.: Defending against neural network model stealing attacks using deceptive perturbations. In: 2019 IEEE Security and Privacy Workshops, pp. 92--98 (2019). \url{https://doi.org/10.1109/SPW.2019.00020}
+
+\bibitem{juuti2019}
+Juuti, M., Szyller, S., Marchal, S., Asokan, N.: PRADA: protecting against DNN model stealing attacks. In: 2019 IEEE European Symposium on Security and Privacy, pp. 512--527 (2019). \url{https://doi.org/10.1109/EuroSP.2019.00021} (2019)
 
 \end{thebibliography}
 

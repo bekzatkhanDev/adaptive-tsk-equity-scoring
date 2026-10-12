@@ -1,0 +1,177 @@
+{
+  "n_train_rows": 4278,
+  "n_train_days": 718,
+  "n_test_rows": 1722,
+  "n_test_days": 246,
+  "tuning_protocol": "TSK hyper-parameters from experiments/tune_tsk.py on a chronological internal split of the training window (max validated Rank IC s.t. C <= 100); OLS closed-form; carry/equal parameter-free. All models share identical training/test splits, features (TSK/OLS) and labels.",
+  "tsk": {
+    "n_labelled": 1512,
+    "rmse": 12.380527567502645,
+    "mae": 8.80226883068737,
+    "pooled_rank_ic": -0.024281178400365172,
+    "n_rules": 5,
+    "n_free_params": 35,
+    "n_total_params": 50,
+    "conditioning": {
+      "clip_rule_outputs": true,
+      "train": {
+        "rule_output_max_abs": 90.6573497646929,
+        "rule_output_mean_abs": 38.36659873344683,
+        "empirical_C": 72.75714278174134,
+        "bias_bound_with_realised_C": 0.04547321423858834
+      },
+      "test": {
+        "rule_output_max_abs": 90.63803002389452,
+        "rule_output_mean_abs": 37.30952395357549,
+        "empirical_C": 64.84047872956896,
+        "bias_bound_with_realised_C": 0.04052529920598061
+      },
+      "prop1_bound_nominal_C100": 0.06250000000000001,
+      "prop1_assumption_holds": true
+    },
+    "masked_path": {
+      "alpha": 0.05,
+      "draws": 25,
+      "n_masked_rows": 208,
+      "mean_abs_delta_on_pre_agm": 0.10273942487566882,
+      "mean_signed_bias": -0.0013488934292117142,
+      "mean_abs_bias": 0.007048171538087805,
+      "pooled_rank_ic_mean": -0.0240611000954689,
+      "pooled_rank_ic_sd": 0.0009576850588910287,
+      "rmse_mean": 12.380164508330388,
+      "rmse_sd": 0.0018363497762084056,
+      "net_sharpe_base_mean": 2.636952943469998,
+      "net_sharpe_base_sd": 0.11806801782010683
+    },
+    "pooled_rank_ic_ci95": [
+      -0.09066647223758,
+      0.07755136490233522
+    ],
+    "daily_rank_ic_per_asset": {
+      "AIRA": 0.0437,
+      "KCEL": -0.0401,
+      "KEGC": -0.0253,
+      "KMGZ": -0.0151,
+      "KZAP": 0.0001,
+      "KZTK": -0.0522,
+      "KZTO": -0.2228
+    },
+    "daily_rank_ic_panel_mean": -0.04450891634473243,
+    "monthly_rank_ic_mean": 0.4383116883116884,
+    "monthly_rank_ic_se": 0.061688311688311695,
+    "net_sharpe_by_cost_bps": {
+      "15": 2.581702237612981,
+      "25": 2.541080599621687,
+      "35": 2.5004589616303927,
+      "50": 2.4395265046434518
+    },
+    "net_sharpe_base_ci95": [
+      0.6677974780292674,
+      5.5534202789615605
+    ],
+    "turnover": {
+      "n_rebalances": 11.0,
+      "monthly_turnover_oneway": 0.4666666666666666,
+      "annual_turnover": 5.6,
+      "drag_bps_per_mo_15": 0.0006999999999999999,
+      "drag_bps_per_mo_25": 0.0011666666666666665,
+      "drag_bps_per_mo_35": 0.0016333333333333332,
+      "drag_bps_per_mo_50": 0.002333333333333333
+    }
+  },
+  "ols": {
+    "n_labelled": 1512,
+    "rmse": 12.085534982833554,
+    "mae": 8.664334083238659,
+    "pooled_rank_ic": -0.04596028235231907,
+    "n_params": 4,
+    "net_sharpe_by_cost_bps": {
+      "15": 0.8372705920215966,
+      "25": 0.788393900488156,
+      "35": 0.7395172089547155,
+      "50": 0.6662021716545549
+    },
+    "turnover": {
+      "n_rebalances": 11.0,
+      "monthly_turnover_oneway": 0.5666666666666667,
+      "annual_turnover": 6.8,
+      "drag_bps_per_mo_15": 0.00085,
+      "drag_bps_per_mo_25": 0.0014166666666666666,
+      "drag_bps_per_mo_35": 0.001983333333333333,
+      "drag_bps_per_mo_50": 0.002833333333333333
+    }
+  },
+  "naive_baselines": {
+    "carry": {
+      "n_labelled": 1512,
+      "rmse": 52.34469957004911,
+      "mae": 50.96947114317677,
+      "pooled_rank_ic": 0.1698840672099921,
+      "monthly_rank_ic": [
+        0.24603174603174605,
+        0.17571570166189368
+      ],
+      "net_sharpe_by_cost_bps": {
+        "15": 1.6370970402845346,
+        "25": 1.6191335416990174,
+        "35": 1.6011700431135008,
+        "50": 1.5742247952352253
+      }
+    },
+    "equal": {
+      "n_labelled": 1512,
+      "rmse": 11.97961504974018,
+      "mae": 8.65127803800936,
+      "pooled_rank_ic": null,
+      "monthly_rank_ic": [
+        null,
+        null
+      ],
+      "net_sharpe_by_cost_bps": {
+        "15": -2.910860055322972,
+        "25": -2.910860055322972,
+        "35": -2.910860055322972,
+        "50": -2.910860055322972
+      }
+    }
+  },
+  "monthly_rank_ic_per_month": {
+    "2025-01-05": 0.3571,
+    "2025-02-03": 0.4643,
+    "2025-03-03": 0.3214,
+    "2025-04-01": 0.3929,
+    "2025-05-02": 0.6786,
+    "2025-06-02": 0.1786,
+    "2025-07-01": 0.5,
+    "2025-08-01": 0.2857,
+    "2025-09-02": 0.8571,
+    "2025-10-01": 0.5714,
+    "2025-11-03": 0.2143
+  },
+  "portfolio_picks": [
+    "KCEL,KZTK,KZTO",
+    "KMGZ,KZTK,KZTO",
+    "KCEL,KZTK,KZTO",
+    "KEGC,KZTK,KZTO",
+    "AIRA,KEGC,KMGZ",
+    "KCEL,KEGC,KZAP",
+    "AIRA,KCEL,KMGZ",
+    "AIRA,KZAP,KZTO",
+    "AIRA,KEGC,KZAP",
+    "AIRA,KMGZ,KZAP",
+    "AIRA,KZAP,KZTK"
+  ],
+  "ols_portfolio_picks": [
+    "KCEL,KEGC,KMGZ",
+    "KCEL,KZTK,KZTO",
+    "AIRA,KMGZ,KZTK",
+    "KCEL,KEGC,KZTK",
+    "KEGC,KZAP,KZTK",
+    "AIRA,KCEL,KZAP",
+    "KMGZ,KZAP,KZTK",
+    "KMGZ,KZTK,KZTO",
+    "KCEL,KEGC,KZAP",
+    "AIRA,KCEL,KZAP",
+    "AIRA,KMGZ,KZAP"
+  ]
+}

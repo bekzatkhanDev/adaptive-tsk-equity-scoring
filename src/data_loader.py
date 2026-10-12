@@ -34,6 +34,7 @@ __all__ = [
     "load_tonia",
     "load_fx",
     "load_dividends",
+    "load_board_decisions",
     "risk_free_daily",
     "compute_features",
     "compute_target",
@@ -300,22 +301,89 @@ def risk_free_daily(tonia: pd.DataFrame) -> pd.DataFrame:
 
 # ------------------------------------------------------------------ dividends
 def load_dividends(cfg: dict) -> pd.DataFrame:
-    """Optional dividends file ``ticker, ex_date, dividend`` (KZT per share).
+    """Optional dividends file (KZT per share).
 
-    Returns an empty (correctly typed) frame when the file is absent.
+    Accepts the canonical ``ticker, ex_date, dividend`` schema as well as the
+    collected broker-style schema (``ex_dividend_date``,
+    ``dividend_per_share_kzt`` plus an optional ``status`` column). Rows with a
+    cancelled status are excluded (a cancelled declaration pays nothing);
+    ``N/A`` dates/amounts fall out via coercion. Returns an empty (correctly
+    typed) frame when the file is absent.
     """
     path = _PROJECT_ROOT / cfg["paths"].get("raw_dividends", "")
     if not path or not Path(path).exists():
         return pd.DataFrame({"ticker": [], "ex_date": [], "dividend": []})
     frame = pd.read_csv(path, encoding="utf-8-sig")
+    cols = {str(c).strip().lower(): c for c in frame.columns}
+    if "ticker" not in cols:
+        return pd.DataFrame({"ticker": [], "ex_date": [], "dividend": []})
+    ex_col = cols.get("ex_date", cols.get("ex_dividend_date"))
+    div_col = cols.get("dividend", cols.get("dividend_per_share_kzt"))
+    if ex_col is None or div_col is None:
+        return pd.DataFrame({"ticker": [], "ex_date": [], "dividend": []})
     out = pd.DataFrame(
         {
-            "ticker": frame["ticker"].astype(str).str.upper().str.strip(),
-            "ex_date": pd.to_datetime(frame["ex_date"], errors="coerce"),
-            "dividend": pd.to_numeric(frame["dividend"], errors="coerce"),
+            "ticker": frame[cols["ticker"]].astype(str).str.upper().str.strip(),
+            "ex_date": pd.to_datetime(frame[ex_col], errors="coerce"),
+            "dividend": pd.to_numeric(frame[div_col], errors="coerce"),
         }
-    ).dropna(subset=["ex_date"])
-    return out
+    )
+    if "status" in cols:
+        cancelled = {"cancelled", "canceled", "cancel",
+                     "отменен", "отменён", "отменено"}
+        keep = (~frame[cols["status"]].astype(str)
+                .str.strip().str.lower().isin(cancelled)).to_numpy()
+        out = out[keep]
+    return out.dropna(subset=["ex_date", "dividend"]).reset_index(drop=True)
+
+
+def _parse_pct(series: pd.Series) -> pd.Series:
+    """Parse ``'50%'``, ``'Не указан'``, ``'N/A'`` etc. to a 0--1 fraction."""
+    s = series.astype(str).str.strip()
+    s = s.str.replace("%", "", regex=False).str.replace(",", ".", regex=False)
+    s = s.str.replace("\u00a0", "", regex=False).str.strip()
+    return pd.to_numeric(s, errors="coerce") / 100.0
+
+
+def load_board_decisions(cfg: dict, fiscal_year: int = 2024) -> pd.DataFrame:
+    """Board payout decisions for one fiscal year.
+
+    Accepts the collected schema (``ticker, fiscal_year, decision_date,
+    approved_pct, source_url, band_lo, band_hi, policy_url``) and returns a
+    tidy frame with ``ticker, decision_date, approved`` (0--1 fraction of
+    profit), ``band_lo``/``band_hi`` (published policy band, NaN when
+    unpublished), ``source_url`` and ``policy_url``. ``'Не указан'`` /
+    ``'N/A'`` / ``'band: not published'`` values coerce to NaT/NaN. Empty
+    frame when the file is absent.
+    """
+    path = _PROJECT_ROOT / "data" / "raw" / "financials" / "actual_decisions.csv"
+    cols_out = ["ticker", "decision_date", "approved",
+                "band_lo", "band_hi", "source_url", "policy_url"]
+    if not path.exists():
+        return pd.DataFrame({c: [] for c in cols_out})
+    frame = pd.read_csv(path, encoding="utf-8-sig")
+    cols = {str(c).strip().lower(): c for c in frame.columns}
+    get = lambda *names: next((frame[cols[n]] for n in names if n in cols),
+                              pd.Series([pd.NA] * len(frame)))
+    sub = frame.copy()
+    if "fiscal_year" in cols:
+        fy = pd.to_numeric(frame[cols["fiscal_year"]], errors="coerce")
+        sub = frame[fy == fiscal_year]
+        get = (lambda _f: (lambda *names: next(
+            (_f[cols[n]] for n in names if n in cols),
+            pd.Series([pd.NA] * len(_f)))))(sub)
+    return pd.DataFrame(
+        {
+            "ticker": get("ticker").astype(str).str.upper().str.strip(),
+            "decision_date": pd.to_datetime(get("decision_date"),
+                                            errors="coerce"),
+            "approved": _parse_pct(get("approved_pct", "approved")),
+            "band_lo": _parse_pct(get("band_lo")),
+            "band_hi": _parse_pct(get("band_hi")),
+            "source_url": get("source_url", "source").astype(str),
+            "policy_url": get("policy_url").astype(str),
+        }
+    ).reset_index(drop=True)
 
 
 # ------------------------------------------------------------------- features
@@ -339,7 +407,7 @@ def _order_flow(frame: pd.DataFrame, mode: str, eps_clv: float) -> pd.Series:
     if mode == "hybrid":
         valid = high.notna() & low.notna() & (high > low)
         return clv.where(valid, tick)
-    raise ValueError("of_mode must be one of 'clv', 'tick', 'hybrid'")
+    raise ValueError("clv_mode must be one of 'clv', 'tick', 'hybrid'")
 
 
 def compute_features(ohlc: pd.DataFrame, cfg: dict) -> pd.DataFrame:
@@ -353,7 +421,7 @@ def compute_features(ohlc: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     window = int(feats.get("vwap_window", 20))
     vol_window = int(feats.get("volume_window", window))
     eps_rel = float(feats.get("epsilon_volume_rel", 1e-6))
-    mode = str(feats.get("of_mode", "hybrid"))
+    mode = str(feats.get("clv_mode", feats.get("of_mode", "hybrid")))
 
     frame = ohlc.sort_values("date").reset_index(drop=True)
     close = frame["close"].astype(float)

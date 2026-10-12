@@ -29,6 +29,7 @@ from src.backtest import (
     per_asset_rank_ic,
     pooled_rank_ic,
     rank_ic,
+    rank_ic,
     top_n_portfolio_returns,
     turnover_report,
 )
@@ -104,17 +105,89 @@ def ols_baseline(train: pd.DataFrame, test: pd.DataFrame) -> tuple[pd.DataFrame,
     return scored, beta
 
 
-def naive_baselines(test: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    """Zero-parameter baselines on the shared test panel (review item 3).
+def naive_baselines(train: pd.DataFrame, test: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Non-learned portfolio benchmarks with explicit, reproducible tie handling.
 
-    * ``carry`` -- ranks by last month's realised forward return (persistence);
-    * ``equal`` -- constant score (no ranking information; IC ~ 0 by design).
-    Both reuse the test panel's forward returns, so portfolio/IC comparison
-    with TSK and OLS is on strictly identical labels and dates.
+    ``equal_weight_all7`` is evaluated separately from score ranking, while
+    ``random_top3`` draws a fixed-seed subset at each rebalance.  Momentum uses
+    the trailing five-day close return, computed from history ending before the
+    rebalance date; it is therefore not a forward-label proxy.
     """
-    scored_carry = test.assign(Y_attr=test["R30"].shift(21).fillna(0.0))
+    history = pd.concat([train, test], ignore_index=True).sort_values(["ticker", "date"])
+    history["momentum_5d"] = history.groupby("ticker")["close"].pct_change(5)
+    momentum = history[history["date"].isin(test["date"])].copy()
+    momentum = momentum[momentum["ticker"].isin(test["ticker"].unique())]
+    scored_momentum = test.merge(
+        momentum[["date", "ticker", "momentum_5d"]], on=["date", "ticker"], how="left"
+    ).assign(Y_attr=lambda frame: frame["momentum_5d"].fillna(0.0))
+
+    rng = np.random.default_rng(20250921)
+    random_scores = []
+    for date, day in test.groupby("date", sort=True):
+        order = list(day["ticker"])
+        rng.shuffle(order)
+        random_scores.extend(
+            {"date": date, "ticker": ticker, "random_rank": rank}
+            for rank, ticker in enumerate(order)
+        )
+    random_frame = pd.DataFrame(random_scores)
+    scored_random = test.merge(random_frame, on=["date", "ticker"], how="left")
+    scored_random["Y_attr"] = -scored_random["random_rank"]
+
     scored_equal = test.assign(Y_attr=50.0)
-    return {"carry": scored_carry, "equal": scored_equal}
+    return {
+        "momentum_5d": scored_momentum,
+        "random_top3": scored_random,
+        "equal_weight_all7": scored_equal,
+    }
+
+
+def equal_weight_portfolio(panel: pd.DataFrame) -> pd.DataFrame:
+    """Equal-weight all available names on each monthly rebalance date."""
+    rows = []
+    for _stamp, group in panel.groupby(pd.Grouper(key="date", freq="MS")):
+        first_day = group["date"].min()
+        day = panel[(panel["date"] == first_day) & panel["R30"].notna()]
+        if day.empty:
+            continue
+        rows.append({
+            "date": first_day,
+            "portfolio_return": float(day["R30"].mean()),
+            "n_picks": int(day["ticker"].nunique()),
+            "picks": ",".join(sorted(day["ticker"].unique())),
+        })
+    return pd.DataFrame(rows)
+
+
+def daily_cross_sectional_diagnostics(panel: pd.DataFrame) -> dict:
+    """Report date-level ICs and robustness to within-month rebalance offsets."""
+    per_day = {}
+    for date, day in panel.groupby("date", sort=True):
+        labelled = day.dropna(subset=["R30"])
+        if labelled["ticker"].nunique() >= 3:
+            per_day[str(pd.Timestamp(date).date())] = rank_ic(
+                labelled["Y_attr"].to_numpy(), labelled["R30"].to_numpy()
+            )
+    offsets = {}
+    for offset in (1, 5, 10, 15):
+        values = []
+        for _month, group in panel.groupby(pd.Grouper(key="date", freq="MS")):
+            dates = sorted(group["date"].unique())
+            if len(dates) < offset:
+                continue
+            day = panel[panel["date"] == dates[offset - 1]].dropna(subset=["R30"])
+            if day["ticker"].nunique() >= 3:
+                values.append(rank_ic(day["Y_attr"].to_numpy(), day["R30"].to_numpy()))
+        offsets[str(offset)] = {
+            "mean_ic": float(np.nanmean(values)) if values else None,
+            "n_dates": len(values),
+        }
+    finite = [v for v in per_day.values() if np.isfinite(v)]
+    return {
+        "mean_daily_cross_sectional_ic": float(np.mean(finite)) if finite else None,
+        "per_date": per_day,
+        "monthly_rebalance_offsets": offsets,
+    }
 
 
 def conditioning_report(model: TSKFuzzySystem, train: pd.DataFrame, test: pd.DataFrame) -> dict:
@@ -244,8 +317,13 @@ def evaluate(cfg: dict, model: TSKFuzzySystem, train: pd.DataFrame, test: pd.Dat
     }
     naive_reports = {}
     naive_portfolios = {}
-    for name, naive_scored in naive_baselines(test).items():
-        naive_port = top_n_portfolio_returns(naive_scored, top_n=int(cfg["backtest"]["top_n"]))
+    for name, naive_scored in naive_baselines(train, test).items():
+        if name == "equal_weight_all7":
+            naive_port = equal_weight_portfolio(naive_scored)
+        else:
+            naive_port = top_n_portfolio_returns(
+                naive_scored, top_n=int(cfg["backtest"]["top_n"])
+            )
         naive_portfolios[name] = naive_port
         naive_reports[name] = {
             **fit_metrics(naive_scored),
@@ -262,9 +340,10 @@ def evaluate(cfg: dict, model: TSKFuzzySystem, train: pd.DataFrame, test: pd.Dat
         "n_test_rows": int(len(panel)),
         "n_test_days": int(panel["date"].nunique()),
         "tuning_protocol": (
-            "TSK hyper-parameters from experiments/tune_tsk.py on a chronological "
+            "TSK hyper-parameters from experiments/frozen_oos.py on a chronological "
             "internal split of the training window (max validated Rank IC s.t. "
-            "C <= 100); OLS closed-form; carry/equal parameter-free. All models "
+            "C <= 100, with a 30-trading-day embargo); OLS closed-form; "
+            "benchmarks parameter-free or fixed-seed. All models "
             "share identical training/test splits, features (TSK/OLS) and labels."
         ),
         "tsk": {
@@ -284,6 +363,7 @@ def evaluate(cfg: dict, model: TSKFuzzySystem, train: pd.DataFrame, test: pd.Dat
             "net_sharpe_by_cost_bps": tiers,
             "net_sharpe_base_ci95": [sharpe_low, sharpe_high],
             "turnover": turnover_report(portfolio),
+            "daily_cross_sectional_diagnostics": daily_cross_sectional_diagnostics(panel),
         },
         "ols": {
             **fit_metrics(ols_scored),

@@ -4,9 +4,11 @@ Refits the canonical TSK/ANFIS protocol on expanding training windows and
 scores each held-out year, so no single test year (2025) carries the whole
 claim. Splits are chronological and strictly out-of-sample: with bars from
 2022 on, the feasible folds are train 2022 -> test 2023, train 2022-2023 ->
-test 2024, and the canonical train 2022-2024 -> test 2025. Each fold rebuilds
-labels with training-window-only moments (no leakage) and runs the shared
-ANFIS protocol (same K, radius, ridge, epochs as the deployed model).
+test 2024, and the canonical train 2022-2024 -> test 2025. Each fold rebuilds labels with training-window-only moments, removes the
+30-trading-day label-overlap region, and uses the frozen specification selected
+on the 2022--2024 pre-2025 validation window. The first two folds are therefore
+chronologically held out for returns, but not independent of that later
+selection exercise; this limitation is recorded in the output.
 
 Example
 -------
@@ -35,6 +37,7 @@ from src.backtest import (
     top_n_portfolio_returns,
 )
 from src.data_loader import build_panel, feature_columns, load_config
+from experiments.purged_robustness import purge_train
 from src.TSK_engine import TSKFuzzySystem
 
 FOLDS = [
@@ -42,6 +45,8 @@ FOLDS = [
     ("2022-01-01", "2023-12-31", "2024-01-01", "2024-12-31"),
     ("2022-01-01", "2024-12-31", "2025-01-01", "2025-12-31"),
 ]
+FROZEN_SPEC = {"n_rules": 3, "cluster_radius": 0.4, "ridge_lambda": 100.0}
+EMBARGO_TRADING_DAYS = 30
 
 
 def _split_panel(cfg: dict, tr0: str, tr1: str, te0: str, te1: str):
@@ -92,12 +97,16 @@ def main() -> None:
     rows = []
     for tr0, tr1, te0, te1 in FOLDS:
         train, test = _split_panel(cfg, tr0, tr1, te0, te1)
+        full = pd.concat([train, test], ignore_index=True)
+        train, purge_cutoff = purge_train(train, full, EMBARGO_TRADING_DAYS)
+        fold_cfg = copy.deepcopy(cfg)
+        fold_cfg["tsk"].update(FROZEN_SPEC)
         if len(train) < 100 or len(test) < 50:
             rows.append({"train": f"{tr0}..{tr1}", "test_year": te0[:4],
                          "note": "insufficient bars", "n_train": len(train),
                          "n_test": len(test)})
             continue
-        model = _fit(cfg, feats, train, epochs)
+        model = _fit(fold_cfg, feats, train, epochs)
         scored = test.assign(Y_attr=model.score(test[list(feats)].to_numpy(dtype=float)))
         labelled = scored.dropna(subset=["Y_target"])
         port = top_n_portfolio_returns(scored, top_n=top_n)
@@ -110,6 +119,8 @@ def main() -> None:
             "pooled_rank_ic": pooled_rank_ic(scored),
             "monthly_rank_ic": mean_m, "monthly_rank_ic_se": se_m,
             "net_sharpe_15bps": net_sharpe(port, cost_bps=15.0),
+            "purge_cutoff": purge_cutoff,
+            "spec": FROZEN_SPEC,
         })
     table = pd.DataFrame(rows)
     logs = Path(cfg["paths"]["logs"])
@@ -117,6 +128,13 @@ def main() -> None:
     ics = table["monthly_rank_ic"].to_numpy(dtype=float)
     sharpes = table["net_sharpe_15bps"].to_numpy(dtype=float)
     summary = {
+        "spec": FROZEN_SPEC,
+        "embargo_trading_days": EMBARGO_TRADING_DAYS,
+        "selection_window": (
+            "36-point grid selected on the pre-2025 2022-01-01..2024-12-31 "
+            "training window, internal chronological validation split; "
+            "folds 2023/2024 are not independent of this later selection"
+        ),
         "folds": rows,
         "monthly_ic_mean": float(np.nanmean(ics)) if len(ics) else float("nan"),
         "monthly_ic_t_ci95": [float(v) for v in t_ci95(ics)],
