@@ -29,11 +29,16 @@ from src.backtest import (
     per_asset_rank_ic,
     pooled_rank_ic,
     rank_ic,
+    rank_ic,
     top_n_portfolio_returns,
+    turnover_report,
 )
-from src.data_loader import FEATURE_COLUMNS, build_panel, load_config
+from src.data_loader import build_panel, feature_columns, load_config
 from src.masking import masked_scores, prop1_bias_bound
 from src.TSK_engine import TSKFuzzySystem
+
+# Config-aware active input vector (canonical three inputs by default).
+FEATURE_COLUMNS = feature_columns(load_config())
 
 
 def _panel_block_bootstrap_ic(panel: pd.DataFrame, b: int, block: int, seed: int):
@@ -64,6 +69,17 @@ def _sharpe_bootstrap_ci(portfolio: pd.DataFrame, cost_bps: float, b: int, seed:
     return float(low), float(high)
 
 
+def _sanitize(obj):
+    """Recursively map NaN/inf floats to None so the JSON report is strict."""
+    if isinstance(obj, float):
+        return obj if np.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize(v) for v in obj]
+    return obj
+
+
 def fit_metrics(scored: pd.DataFrame) -> dict:
     """RMSE / MAE against the bounded target and pooled Rank IC vs forward returns."""
     labelled = scored.dropna(subset=["Y_target"])
@@ -87,6 +103,91 @@ def ols_baseline(train: pd.DataFrame, test: pd.DataFrame) -> tuple[pd.DataFrame,
         Y_attr=beta[0] + test[list(FEATURE_COLUMNS)].to_numpy(dtype=float) @ beta[1:]
     )
     return scored, beta
+
+
+def naive_baselines(train: pd.DataFrame, test: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Non-learned portfolio benchmarks with explicit, reproducible tie handling.
+
+    ``equal_weight_all7`` is evaluated separately from score ranking, while
+    ``random_top3`` draws a fixed-seed subset at each rebalance.  Momentum uses
+    the trailing five-day close return, computed from history ending before the
+    rebalance date; it is therefore not a forward-label proxy.
+    """
+    history = pd.concat([train, test], ignore_index=True).sort_values(["ticker", "date"])
+    history["momentum_5d"] = history.groupby("ticker")["close"].pct_change(5)
+    momentum = history[history["date"].isin(test["date"])].copy()
+    momentum = momentum[momentum["ticker"].isin(test["ticker"].unique())]
+    scored_momentum = test.merge(
+        momentum[["date", "ticker", "momentum_5d"]], on=["date", "ticker"], how="left"
+    ).assign(Y_attr=lambda frame: frame["momentum_5d"].fillna(0.0))
+
+    rng = np.random.default_rng(20250921)
+    random_scores = []
+    for date, day in test.groupby("date", sort=True):
+        order = list(day["ticker"])
+        rng.shuffle(order)
+        random_scores.extend(
+            {"date": date, "ticker": ticker, "random_rank": rank}
+            for rank, ticker in enumerate(order)
+        )
+    random_frame = pd.DataFrame(random_scores)
+    scored_random = test.merge(random_frame, on=["date", "ticker"], how="left")
+    scored_random["Y_attr"] = -scored_random["random_rank"]
+
+    scored_equal = test.assign(Y_attr=50.0)
+    return {
+        "momentum_5d": scored_momentum,
+        "random_top3": scored_random,
+        "equal_weight_all7": scored_equal,
+    }
+
+
+def equal_weight_portfolio(panel: pd.DataFrame) -> pd.DataFrame:
+    """Equal-weight all available names on each monthly rebalance date."""
+    rows = []
+    for _stamp, group in panel.groupby(pd.Grouper(key="date", freq="MS")):
+        first_day = group["date"].min()
+        day = panel[(panel["date"] == first_day) & panel["R30"].notna()]
+        if day.empty:
+            continue
+        rows.append({
+            "date": first_day,
+            "portfolio_return": float(day["R30"].mean()),
+            "n_picks": int(day["ticker"].nunique()),
+            "picks": ",".join(sorted(day["ticker"].unique())),
+        })
+    return pd.DataFrame(rows)
+
+
+def daily_cross_sectional_diagnostics(panel: pd.DataFrame) -> dict:
+    """Report date-level ICs and robustness to within-month rebalance offsets."""
+    per_day = {}
+    for date, day in panel.groupby("date", sort=True):
+        labelled = day.dropna(subset=["R30"])
+        if labelled["ticker"].nunique() >= 3:
+            per_day[str(pd.Timestamp(date).date())] = rank_ic(
+                labelled["Y_attr"].to_numpy(), labelled["R30"].to_numpy()
+            )
+    offsets = {}
+    for offset in (1, 5, 10, 15):
+        values = []
+        for _month, group in panel.groupby(pd.Grouper(key="date", freq="MS")):
+            dates = sorted(group["date"].unique())
+            if len(dates) < offset:
+                continue
+            day = panel[panel["date"] == dates[offset - 1]].dropna(subset=["R30"])
+            if day["ticker"].nunique() >= 3:
+                values.append(rank_ic(day["Y_attr"].to_numpy(), day["R30"].to_numpy()))
+        offsets[str(offset)] = {
+            "mean_ic": float(np.nanmean(values)) if values else None,
+            "n_dates": len(values),
+        }
+    finite = [v for v in per_day.values() if np.isfinite(v)]
+    return {
+        "mean_daily_cross_sectional_ic": float(np.mean(finite)) if finite else None,
+        "per_date": per_day,
+        "monthly_rebalance_offsets": offsets,
+    }
 
 
 def conditioning_report(model: TSKFuzzySystem, train: pd.DataFrame, test: pd.DataFrame) -> dict:
@@ -202,19 +303,49 @@ def evaluate(cfg: dict, model: TSKFuzzySystem, train: pd.DataFrame, test: pd.Dat
         b=min(int(cfg["backtest"]["bootstrap_B"]), 2000), seed=1,
     )
 
-    # Baseline on identical features/targets.
+    # Baselines on identical features/targets (OLS) and identical labels/dates
+    # (carry = persistence, equal = no-information); documents the tuning
+    # protocol alongside: TSK hyper-parameters come from experiments/tune_tsk.py
+    # (chronological internal split, maximise validated Rank IC s.t. C <= 100;
+    # deployed K=5/r=0.5/ridge=10 retained after the OOS reversal check), OLS is
+    # closed-form (no hyper-parameters), carry/equal have none by construction.
     ols_scored, beta = ols_baseline(train, test)
     ols_portfolio = top_n_portfolio_returns(ols_scored, top_n=int(cfg["backtest"]["top_n"]))
     ols_tiers = {
         str(bps): net_sharpe(ols_portfolio, cost_bps=bps)
         for bps in cfg["backtest"]["cost_tiers_bps"]
     }
+    naive_reports = {}
+    naive_portfolios = {}
+    for name, naive_scored in naive_baselines(train, test).items():
+        if name == "equal_weight_all7":
+            naive_port = equal_weight_portfolio(naive_scored)
+        else:
+            naive_port = top_n_portfolio_returns(
+                naive_scored, top_n=int(cfg["backtest"]["top_n"])
+            )
+        naive_portfolios[name] = naive_port
+        naive_reports[name] = {
+            **fit_metrics(naive_scored),
+            "monthly_rank_ic": monthly_rank_ic(naive_scored)[:2],
+            "net_sharpe_by_cost_bps": {
+                str(bps): net_sharpe(naive_port, cost_bps=bps)
+                for bps in cfg["backtest"]["cost_tiers_bps"]
+            },
+        }
 
     return {
         "n_train_rows": int(len(train)),
         "n_train_days": int(train["date"].nunique()),
         "n_test_rows": int(len(panel)),
         "n_test_days": int(panel["date"].nunique()),
+        "tuning_protocol": (
+            "TSK hyper-parameters from experiments/frozen_oos.py on a chronological "
+            "internal split of the training window (max validated Rank IC s.t. "
+            "C <= 100, with a 30-trading-day embargo); OLS closed-form; "
+            "benchmarks parameter-free or fixed-seed. All models "
+            "share identical training/test splits, features (TSK/OLS) and labels."
+        ),
         "tsk": {
             **fit_metrics(panel),
             "n_rules": int(model.n_rules),
@@ -231,12 +362,16 @@ def evaluate(cfg: dict, model: TSKFuzzySystem, train: pd.DataFrame, test: pd.Dat
             "monthly_rank_ic_se": se_m,
             "net_sharpe_by_cost_bps": tiers,
             "net_sharpe_base_ci95": [sharpe_low, sharpe_high],
+            "turnover": turnover_report(portfolio),
+            "daily_cross_sectional_diagnostics": daily_cross_sectional_diagnostics(panel),
         },
         "ols": {
             **fit_metrics(ols_scored),
             "n_params": int(len(beta)),
             "net_sharpe_by_cost_bps": ols_tiers,
+            "turnover": turnover_report(ols_portfolio),
         },
+        "naive_baselines": naive_reports,
         "monthly_rank_ic_per_month": {str(k.date()): round(v, 4) for k, v in per_month.items()},
         "portfolio_picks": portfolio["picks"].tolist(),
         "ols_portfolio_picks": ols_portfolio["picks"].tolist(),
@@ -265,7 +400,7 @@ def main() -> None:
     scored.to_csv(exports / "oos_scores.csv", index=False)
     portfolio.to_csv(exports / "oos_portfolio.csv", index=False)
     Path(cfg["paths"]["logs"]).joinpath("oos_2025_report.json").write_text(
-        json.dumps(report, indent=2, default=str), encoding="utf-8"
+        json.dumps(_sanitize(report), indent=2, default=str), encoding="utf-8"
     )
 
     if args.ticker:

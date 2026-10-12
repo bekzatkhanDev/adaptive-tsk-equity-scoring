@@ -1,0 +1,100 @@
+{
+  "n_masked_rows": 208,
+  "rebalances": [
+    {
+      "date": "2025-01-05",
+      "n_masked_names": 0,
+      "n_names": 7
+    },
+    {
+      "date": "2025-02-03",
+      "n_masked_names": 0,
+      "n_names": 7
+    },
+    {
+      "date": "2025-03-03",
+      "n_masked_names": 0,
+      "n_names": 7
+    },
+    {
+      "date": "2025-04-01",
+      "n_masked_names": 3,
+      "n_names": 7
+    },
+    {
+      "date": "2025-05-02",
+      "n_masked_names": 6,
+      "n_names": 7
+    },
+    {
+      "date": "2025-06-02",
+      "n_masked_names": 2,
+      "n_names": 7
+    },
+    {
+      "date": "2025-07-01",
+      "n_masked_names": 0,
+      "n_names": 7
+    },
+    {
+      "date": "2025-08-01",
+      "n_masked_names": 0,
+      "n_names": 7
+    },
+    {
+      "date": "2025-09-02",
+      "n_masked_names": 0,
+      "n_names": 7
+    },
+    {
+      "date": "2025-10-01",
+      "n_masked_names": 0,
+      "n_names": 7
+    },
+    {
+      "date": "2025-11-03",
+      "n_masked_names": 0,
+      "n_names": 7
+    },
+    {
+      "date": "2025-12-01",
+      "n_masked_names": 0,
+      "n_names": 7
+    }
+  ],
+  "base_signal_sd_in_window": 2.658761584727996,
+  "schemes": {
+    "fixed": {
+      "pooled_ic_mean": 0.0208986008311816,
+      "pooled_ic_sd": 0.0009712830926694849,
+      "monthly_ic_mean": 0.5253246753246753,
+      "monthly_ic_sd": 0.008400171742242495,
+      "rmse_mean": 13.810963089671247,
+      "net_sharpe_mean": 2.2164762923523806,
+      "net_sharpe_sd": 0.023932239936722985,
+      "noise_sd": 0.15896890210529052,
+      "signed_bias": -0.0008851618617061498,
+      "mean_abs_dev": 0.11842257318446313,
+      "noise_to_signal": 0.059790581832689524
+    },
+    "adaptive": {
+      "pooled_ic_mean": 0.01896655203052922,
+      "pooled_ic_sd": 0.009220618032238616,
+      "monthly_ic_mean": 0.4962987012987014,
+      "monthly_ic_sd": 0.033220852474820615,
+      "rmse_mean": 13.829251390699683,
+      "net_sharpe_mean": 2.0903352455311945,
+      "net_sharpe_sd": 0.17171522816884854,
+      "noise_sd": 2.0051300862319295,
+      "signed_bias": -0.0417920304446105,
+      "mean_abs_dev": 1.5732079841694704,
+      "noise_to_signal": 0.7541594168313004
+    }
+  },
+  "unmasked": {
+    "pooled_ic": 0.020595081579455696,
+    "monthly_ic": 0.5194805194805195,
+    "rmse": 13.811324857394046,
+    "net_sharpe": 2.187459993495847
+  }
+}

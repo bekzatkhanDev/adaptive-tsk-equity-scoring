@@ -19,7 +19,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.data_loader import FEATURE_COLUMNS, build_panel, load_config, target_horizons
+from src.data_loader import build_panel, feature_columns, load_config, target_horizons
+
+# Config-aware active input vector so the export carries whatever the model trains on.
+FEATURE_COLUMNS = feature_columns(load_config())
 
 # Columns carried by ``build_panel`` that we expose (the label block is extended
 # with the multi-horizon ``R{h}`` / ``Y_target_{h}`` columns in ``main``).

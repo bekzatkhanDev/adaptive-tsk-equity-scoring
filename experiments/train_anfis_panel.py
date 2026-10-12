@@ -19,8 +19,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pandas as pd
 
 from src.anfis_trainer import ANFISTrainer
-from src.data_loader import FEATURE_COLUMNS, build_panel, load_config
+from src.data_loader import build_panel, feature_columns, load_config
 from src.TSK_engine import TSKFuzzySystem
+
+# Config-aware active input vector (equals the canonical three inputs unless the
+# Tier-2 switches in ``config.yaml`` are turned on).
+FEATURE_COLUMNS = feature_columns(load_config())
 
 
 def train_panel(cfg: dict, epochs: int | None = None, verbose: bool = True):
@@ -39,6 +43,7 @@ def train_panel(cfg: dict, epochs: int | None = None, verbose: bool = True):
         neutral_score=float(cfg["target"]["neutral_score"]),
         score_scale=float(cfg["target"]["score_scale"]),
         clip_rule_outputs=bool(tsk_cfg.get("clip_rule_outputs", True)),
+        input_scaling=str(tsk_cfg.get("input_scaling", "raw")),
         feature_names=list(FEATURE_COLUMNS),
     )
     model.init_from_data(X, radius=float(tsk_cfg["cluster_radius"]),

@@ -1,0 +1,77 @@
+{
+  "spec": {
+    "n_rules": 3,
+    "cluster_radius": 0.4,
+    "ridge_lambda": 100.0
+  },
+  "embargo_trading_days": 30,
+  "selection_window": "36-point grid selected on the pre-2025 2022-01-01..2024-12-31 training window, internal chronological validation split; folds 2023/2024 are not independent of this later selection",
+  "folds": [
+    {
+      "train": "2022-01-01..2022-12-31",
+      "test_year": "2023",
+      "n_train": 957,
+      "n_test": 1471,
+      "n_labelled": 1471,
+      "rmse": 15.793883318302514,
+      "pooled_rank_ic": 0.07160754926508775,
+      "monthly_rank_ic": 0.2035714285714286,
+      "monthly_rank_ic_se": 0.16008776388578017,
+      "net_sharpe_15bps": 0.7169993757470476,
+      "purge_cutoff": "2022-11-17",
+      "spec": {
+        "n_rules": 3,
+        "cluster_radius": 0.4,
+        "ridge_lambda": 100.0
+      }
+    },
+    {
+      "train": "2022-01-01..2023-12-31",
+      "test_year": "2024",
+      "n_train": 2397,
+      "n_test": 1695,
+      "n_labelled": 1695,
+      "rmse": 9.64602946127202,
+      "pooled_rank_ic": 0.026741731150951083,
+      "monthly_rank_ic": 0.07916666666666668,
+      "monthly_rank_ic_se": 0.13453135154891374,
+      "net_sharpe_15bps": 0.25323768025512233,
+      "purge_cutoff": "2023-11-16",
+      "spec": {
+        "n_rules": 3,
+        "cluster_radius": 0.4,
+        "ridge_lambda": 100.0
+      }
+    },
+    {
+      "train": "2022-01-01..2024-12-31",
+      "test_year": "2025",
+      "n_train": 4061,
+      "n_test": 1722,
+      "n_labelled": 1512,
+      "rmse": 14.093442909054204,
+      "pooled_rank_ic": 0.052108802731576545,
+      "monthly_rank_ic": 0.2012987012987013,
+      "monthly_rank_ic_se": 0.11974314727340685,
+      "net_sharpe_15bps": 0.9831236728532781,
+      "purge_cutoff": "2024-11-18",
+      "spec": {
+        "n_rules": 3,
+        "cluster_radius": 0.4,
+        "ridge_lambda": 100.0
+      }
+    }
+  ],
+  "monthly_ic_mean": 0.16134559884559888,
+  "monthly_ic_t_ci95": [
+    0.16134559884559888,
+    -0.015470639793775054,
+    0.3381618374849728
+  ],
+  "sharpe_mean": 0.651120242951816,
+  "sharpe_t_ci95": [
+    0.651120242951816,
+    -0.2664599570415359,
+    1.5687004429451679
+  ]
+}

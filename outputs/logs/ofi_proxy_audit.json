@@ -1,0 +1,37 @@
+{
+  "note": "No Level-1 feed available for KASE names: direct CLV-vs-true-OFI correlation infeasible; internal-consistency audit only.",
+  "n_rows": 5993,
+  "proxy_next_day_rank_ic": -0.11145873871661321,
+  "clv_tick_spearman": 0.4989332524351159,
+  "clv_tick_sign_agreement": 0.6992093502921967,
+  "per_ticker": {
+    "AIRA": {
+      "n": 446,
+      "proxy_next_day_ic": 0.031022330997848742
+    },
+    "KCEL": {
+      "n": 963,
+      "proxy_next_day_ic": -0.18409632883853136
+    },
+    "KEGC": {
+      "n": 963,
+      "proxy_next_day_ic": -0.23633942875951372
+    },
+    "KMGZ": {
+      "n": 735,
+      "proxy_next_day_ic": -0.05099444753975446
+    },
+    "KZAP": {
+      "n": 962,
+      "proxy_next_day_ic": -0.03509068313437539
+    },
+    "KZTK": {
+      "n": 962,
+      "proxy_next_day_ic": -0.1713972378235465
+    },
+    "KZTO": {
+      "n": 962,
+      "proxy_next_day_ic": -0.10211021980220496
+    }
+  }
+}

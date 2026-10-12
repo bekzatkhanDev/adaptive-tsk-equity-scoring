@@ -21,8 +21,13 @@ __all__ = [
     "pooled_rank_ic",
     "monthly_rank_ic",
     "block_bootstrap_ci",
+    "top_n_spread_returns",
     "top_n_portfolio_returns",
     "net_sharpe",
+    "turnover_report",
+    "mean_se",
+    "t_ci95",
+    "deflated_sharpe_ratio",
     "period_marks",
     "mark_rank_ic",
 ]
@@ -117,7 +122,14 @@ def top_n_portfolio_returns(
         first_day = group["date"].min()
         day_rows = panel[panel["date"] == first_day]
         day_rows = day_rows[day_rows[ret_col].notna()]
-        picks = day_rows.nlargest(top_n, score_col)
+        picks = (
+            day_rows.sort_values(
+                [score_col, "ticker"],
+                ascending=[False, True],
+                kind="mergesort",
+            )
+            .head(top_n)
+        )
         if picks["ticker"].nunique() < top_n:
             continue
         rows.append({
@@ -149,6 +161,150 @@ def net_sharpe(portfolio: pd.DataFrame, cost_bps: float = 15.0,
     excess = returns - monthly_cost
     std = float(np.std(excess, ddof=1))
     return float(np.mean(excess) / std * np.sqrt(12.0)) if std > 0 else float("nan")
+
+
+def top_n_spread_returns(
+    panel: pd.DataFrame,
+    top_n: int = 3,
+    score_col: str = "Y_attr",
+    ret_col: str = "R30",
+) -> pd.DataFrame:
+    """Dollar-neutral monthly long-top-N / short-bottom-N spread portfolio.
+
+    A cross-sectional ranking claim should be tested on a *spread*, not only on
+    the long leg: with seven names and one test year, a long-only top-3 Sharpe
+    is dominated by the market beta of the picks. Here each month's N highest
+    scored names are funded long against the N lowest scored names (equal
+    weight, unit gross exposure per side), so the reported series is close to
+    market-neutral and measures the ordering information in the score itself.
+    Costs are applied to both legs via ``net_sharpe``'s turnover estimate.
+    """
+    rows = []
+    for stamp, group in panel.groupby(pd.Grouper(key="date", freq="MS")):
+        first_day = group["date"].min()
+        day_rows = panel[panel["date"] == first_day]
+        day_rows = day_rows[day_rows[ret_col].notna()]
+        if day_rows["ticker"].nunique() < 2 * top_n:
+            continue
+        ranked = day_rows.sort_values(
+            [score_col, "ticker"],
+            ascending=[False, True],
+            kind="mergesort",
+        )
+        longs = ranked.head(top_n)
+        shorts = ranked.sort_values(
+            [score_col, "ticker"],
+            ascending=[True, True],
+            kind="mergesort",
+        ).head(top_n)
+        rows.append({
+            "date": first_day,
+            "portfolio_return": float(longs[ret_col].mean() - shorts[ret_col].mean()),
+            "n_picks": int(len(longs) + len(shorts)),
+            "picks": ",".join(sorted(longs["ticker"])) + "|" +
+                     ",".join(sorted(shorts["ticker"])),
+        })
+    return pd.DataFrame(rows)
+
+
+def turnover_report(portfolio: pd.DataFrame) -> dict[str, float]:
+    """Realised turnover and per-tier monthly cost drag of a rebalance ledger.
+
+    Membership change per rebalance is the symmetric difference of the pick
+    sets; one-way monthly turnover is half of that (each rotation sells one
+    name and buys another). Annual turnover annualises the monthly figure;
+    ``drag_bps_{bps}`` is the monthly return haircut at that round-trip tier.
+    """
+    membership = [set(p.split(",")) for p in portfolio["picks"]]
+    changes = [
+        len(membership[i] ^ membership[i - 1]) / max(len(membership[i]), 1)
+        for i in range(1, len(membership))
+    ]
+    monthly_oneway = float(np.mean(changes)) / 2.0 if changes else 0.0
+    out: dict[str, float] = {
+        "n_rebalances": float(len(portfolio)),
+        "monthly_turnover_oneway": monthly_oneway,
+        "annual_turnover": monthly_oneway * 12.0,
+    }
+    for bps in (15, 25, 35, 50):
+        out[f"drag_bps_per_mo_{bps}"] = monthly_oneway * bps / 1e4
+    return out
+
+
+def mean_se(values: np.ndarray) -> tuple[float, float]:
+    """Mean and classical standard error of a finite sample (NaN if < 2)."""
+    vals = np.asarray(values, dtype=float)
+    vals = vals[np.isfinite(vals)]
+    if len(vals) < 2:
+        return (float(np.mean(vals)) if len(vals) else float("nan"), float("nan"))
+    return float(vals.mean()), float(vals.std(ddof=1) / np.sqrt(len(vals)))
+
+
+def t_ci95(values: np.ndarray) -> tuple[float, float, float]:
+    """Mean with a two-sided 95% Student-t confidence interval."""
+    vals = np.asarray(values, dtype=float)
+    vals = vals[np.isfinite(vals)]
+    if len(vals) < 2:
+        return (float(np.mean(vals)) if len(vals) else float("nan"),
+                float("nan"), float("nan"))
+    mean = float(vals.mean())
+    se = float(vals.std(ddof=1) / np.sqrt(len(vals)))
+    half = float(stats.t.ppf(0.975, len(vals) - 1) * se)
+    return mean, mean - half, mean + half
+
+
+def deflated_sharpe_ratio(returns: np.ndarray, n_trials: int,
+                          periodicity: int = 12) -> dict[str, float]:
+    """Deflated Sharpe ratio (Bailey & Lopez de Prado, 2014).
+
+    Corrects the expected maximum Sharpe ratio for selection over ``n_trials``
+    strategy variants (feature sets, hyper-parameter grids ...) and tests the
+    observed Sharpe against that benchmark with a one-sided normal critical
+    value, using the sample's skewness and excess kurtosis.
+
+    Returns ``dsr`` (probability the true Sharpe exceeds the selection-adjusted
+    benchmark), ``sharpe_obs``, ``sr_star`` (the deflated threshold) and
+    ``t_stat``. ``periodicity`` annualises the frequency of ``returns``
+    (12 for monthly, 250 for daily).
+    """
+    r = np.asarray(returns, dtype=float)
+    r = r[np.isfinite(r)]
+    T = len(r)
+    if T < 4 or n_trials < 1:
+        return {"dsr": float("nan"), "sharpe_obs": float("nan"),
+                "sr_star": float("nan"), "t_stat": float("nan")}
+    mean, sd = float(np.mean(r)), float(np.std(r, ddof=1))
+    if sd <= 0:
+        return {"dsr": float("nan"), "sharpe_obs": float("nan"),
+                "sr_star": float("nan"), "t_stat": float("nan")}
+    sharpe = mean / sd
+    skew = float(stats.skew(r, bias=False))
+    kurt = float(stats.kurtosis(r, fisher=True))  # excess kurtosis
+    euler = 0.5772156649015329
+    if n_trials > 1:
+        sr_max = (np.sqrt(2.0 * np.log(n_trials))
+                  - (np.log(np.pi) + euler) / np.sqrt(2.0 * np.log(n_trials)))
+    else:
+        sr_max = 0.0
+    sr_star = (sr_max * np.sqrt(1.0 - skew * sharpe
+                                + ((kurt + 2.0) / 4.0) * sharpe ** 2)
+               + 3.0 * skew / (4.0 * np.sqrt(float(T))))
+    t_stat = (sharpe - sr_star) * np.sqrt(float(T)
+                                          / (1.0 - skew * sharpe
+                                             + ((kurt + 2.0) / 4.0) * sharpe ** 2))
+    dsr = float(stats.norm.cdf(t_stat))
+    return {
+        "dsr": dsr,
+        "sharpe_obs": sharpe * np.sqrt(periodicity),
+        "sr_star": sr_star * np.sqrt(periodicity),
+        "t_stat": t_stat,
+        "n_observations": int(T),
+        "periodicity": int(periodicity),
+        "skewness": skew,
+        "excess_kurtosis": kurt,
+        "benchmark_sharpe_monthly": 0.0,
+        "trial_variance_source": "Bailey-Lopez de Prado finite-sample correction from the observed monthly return skewness and excess kurtosis; n_trials controls the selection threshold",
+    }
 
 
 def period_marks(
